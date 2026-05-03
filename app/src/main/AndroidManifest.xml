@@ -177,7 +177,7 @@
             android:name=".receivers.CopyErrorReceiver"
             android:exported="false">
             <intent-filter>
-                <action android:name="com.looker.droidify.intent.action.COPY_ERROR" />
+                <action android:name="com.dumbermini.apps.intent.action.COPY_ERROR" />
             </intent-filter>
         </receiver>
 

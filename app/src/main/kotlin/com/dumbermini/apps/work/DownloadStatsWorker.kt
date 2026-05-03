@@ -1,0 +1,154 @@
+package com.dumbermini.apps.work
+
+import android.content.Context
+import android.util.Log
+import androidx.hilt.work.HiltWorker
+import androidx.work.CoroutineWorker
+import androidx.work.ExistingWorkPolicy
+import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.WorkManager
+import androidx.work.WorkerParameters
+import com.dumbermini.apps.data.PrivacyRepository
+import com.dumbermini.apps.data.local.model.DownloadStatsData
+import com.dumbermini.apps.data.local.model.DownloadStatsData.Companion.toEpochMillis
+import com.dumbermini.apps.datastore.Settings
+import com.dumbermini.apps.datastore.SettingsRepository
+import com.dumbermini.apps.network.Downloader
+import com.dumbermini.apps.network.NetworkResponse
+import com.dumbermini.apps.utility.common.Constants
+import com.dumbermini.apps.utility.common.cache.Cache
+import com.dumbermini.apps.utility.common.extension.exceptCancellation
+import com.dumbermini.apps.utility.common.generateMonthlyFileNames
+import com.dumbermini.apps.utility.common.toForegroundInfo
+import com.dumbermini.apps.utility.notifications.createDownloadStatsNotification
+import dagger.assisted.Assisted
+import dagger.assisted.AssistedInject
+import io.ktor.http.HttpStatusCode
+import java.io.File
+import java.util.*
+import java.util.concurrent.ConcurrentLinkedQueue
+import kotlin.concurrent.atomics.ExperimentalAtomicApi
+import kotlin.time.ExperimentalTime
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.supervisorScope
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.withContext
+
+@HiltWorker
+class DownloadStatsWorker @AssistedInject constructor(
+    @Assisted private val context: Context,
+    @Assisted params: WorkerParameters,
+    private val privacyRepository: PrivacyRepository,
+    private val settingsRepo: SettingsRepository,
+    private val downloader: Downloader,
+) : CoroutineWorker(context, params) {
+
+    val downloadSemaphores = Semaphore(2)
+
+    override suspend fun doWork(): Result = withContext(Dispatchers.IO) {
+        val settings = settingsRepo.getInitial()
+        if (!settings.dlStatsEnabled) {
+            Log.i(TAG, "Download statistics disabled, skipping")
+            return@withContext Result.success()
+        }
+        try {
+            setForegroundAsync(
+                context
+                    .createDownloadStatsNotification()
+                    .toForegroundInfo(Constants.NOTIFICATION_ID_STATS_DOWNLOAD)
+            )
+            fetchData(settings)
+            Log.i(TAG, "Successfully processed download stats monthly files")
+            Result.success()
+        } catch (e: Exception) {
+            e.exceptCancellation()
+            Log.e(TAG, "Failed fetching download stats", e)
+            Result.failure()
+        }
+    }
+
+    @OptIn(ExperimentalAtomicApi::class)
+    private suspend fun fetchData(settings: Settings) = withContext(Dispatchers.IO) {
+        supervisorScope {
+            val lastModified = settings.lastModifiedDownloadStats
+            val fileNames = ConcurrentLinkedQueue(
+                generateMonthlyFileNames(lastModified)
+            )
+
+            Log.d(TAG, "Fetching ${fileNames.size} monthly files")
+            while (fileNames.isNotEmpty()) {
+                if (downloadSemaphores.tryAcquire()) {
+                    launch {
+                        val fileName = fileNames.poll()
+                        if (fileName == null) {
+                            downloadSemaphores.release()
+                        } else {
+                            val target = Cache.getTemporaryFile(context)
+                            try {
+                                Log.i(TAG, "Downloading $fileName")
+                                val response = downloadFile(fileName, target)
+                                Log.i(TAG, "Downloaded $fileName with $response")
+
+                                if (response is NetworkResponse.Success) {
+                                    val isModified =
+                                        response.statusCode != HttpStatusCode.NotModified.value
+                                    if (isModified) {
+                                        processDownloadStats(
+                                            response = response,
+                                            fileName = fileName,
+                                            target = target
+                                        )
+                                    }
+                                }
+                            } finally {
+                                target.delete()
+                                downloadSemaphores.release()
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    @OptIn(ExperimentalAtomicApi::class, ExperimentalTime::class)
+    private suspend fun processDownloadStats(
+        response: NetworkResponse.Success,
+        fileName: String,
+        target: File,
+    ) {
+        Log.i(TAG, "Processing $fileName")
+        val downloadStats = target.inputStream().use {
+            DownloadStatsData.fromStream(it)
+                .toDownloadStats(fileName.substringBefore('.').toEpochMillis())
+        }
+        privacyRepository.save(downloadStats)
+        settingsRepo.updateLastModifiedDownloadStats(response.lastModified ?: Date())
+        Log.d(TAG, "Processed updated file: $fileName")
+    }
+
+    private suspend fun downloadFile(
+        fileName: String,
+        target: File,
+    ): NetworkResponse = downloader.downloadToFile(
+        url = IZZY_STATS_MONTHLY + fileName,
+        target = target,
+    )
+
+    companion object {
+        private const val TAG = "DownloadStatsWorker"
+
+        private const val IZZY_STATS_MONTHLY =
+            "https://dlstats.izzyondroid.org/iod-stats-collector/stats/basic/monthly/"
+
+        fun fetchDownloadStats(context: Context) {
+            val workManager = WorkManager.getInstance(context)
+            workManager.enqueueUniqueWork(
+                "download_stats",
+                ExistingWorkPolicy.REPLACE,
+                OneTimeWorkRequestBuilder<DownloadStatsWorker>().build(),
+            )
+        }
+    }
+}
