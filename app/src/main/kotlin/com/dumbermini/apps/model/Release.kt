@@ -41,6 +41,16 @@ data class Release(
         return repository.address.toUri().buildUpon().appendPath(release).build().toString()
     }
 
+    val isSplitArchive: Boolean
+        get() = release.endsWith(".zip", ignoreCase = true)
+
     val cacheFileName: String
-        get() = "${hash.replace('/', '-')}.apk"
+        get() {
+            val extension = release
+                .substringAfterLast('/', "")
+                .substringAfterLast('.', "")
+                .takeIf(String::isNotEmpty)
+                ?: "apk"
+            return "${hash.replace('/', '-')}.${extension.lowercase()}"
+        }
 }

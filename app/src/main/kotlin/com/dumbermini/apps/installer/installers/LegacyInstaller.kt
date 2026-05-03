@@ -10,10 +10,12 @@ import com.dumbermini.apps.data.model.PackageName
 import com.dumbermini.apps.datastore.SettingsRepository
 import com.dumbermini.apps.datastore.get
 import com.dumbermini.apps.datastore.model.LegacyInstallerComponent
+import com.dumbermini.apps.installer.installers.session.SessionInstaller
 import com.dumbermini.apps.installer.model.InstallItem
 import com.dumbermini.apps.installer.model.InstallState
 import com.dumbermini.apps.utility.common.SdkCheck
 import com.dumbermini.apps.utility.common.cache.Cache
+import com.dumbermini.apps.utility.common.extension.isSplitApkArchive
 import com.dumbermini.apps.utility.common.extension.intent
 import kotlin.coroutines.resume
 import kotlinx.coroutines.flow.firstOrNull
@@ -32,11 +34,15 @@ class LegacyInstaller(
     override suspend fun install(
         installItem: InstallItem,
     ): InstallState {
+        val releaseFile = Cache.getReleaseFile(context, installItem.installFileName)
+        if (context.isSplitApkArchive(releaseFile)) {
+            return SessionInstaller(context).use { it.install(installItem) }
+        }
         val installFlag = if (SdkCheck.isNougat) Intent.FLAG_GRANT_READ_URI_PERMISSION else 0
         val fileUri = if (SdkCheck.isNougat) {
             Cache.getReleaseUri(context, installItem.installFileName)
         } else {
-            Cache.getReleaseFile(context, installItem.installFileName).toUri()
+            releaseFile.toUri()
         }
 
         val comp = settingsRepository.get { legacyInstallerComponent }.firstOrNull()

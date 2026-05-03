@@ -18,6 +18,7 @@ import com.dumbermini.apps.utility.common.Constants
 import com.dumbermini.apps.utility.common.cache.Cache
 import com.dumbermini.apps.utility.common.extension.addAndCompute
 import com.dumbermini.apps.utility.common.extension.filter
+import com.dumbermini.apps.utility.common.extension.isSplitApkArchive
 import com.dumbermini.apps.utility.common.extension.notificationManager
 import com.dumbermini.apps.utility.common.extension.updateAsMutable
 import com.dumbermini.apps.utility.notifications.createInstallNotification
@@ -109,11 +110,14 @@ class InstallManager(
                         state = InstallState.Installing,
                     )
                 )
+                val releaseFile = Cache.getReleaseFile(context, item.installFileName)
+                val isSplitArchive = context.isSplitApkArchive(releaseFile)
                 val result = installer.use { it.install(item) }
-                if (result == InstallState.Installed && installer !is LegacyInstaller) {
+                if (result == InstallState.Installed &&
+                    (installer !is LegacyInstaller || isSplitArchive)
+                ) {
                     if (deleteApkPreference.first()) {
-                        val apkFile = Cache.getReleaseFile(context, item.installFileName)
-                        apkFile.delete()
+                        releaseFile.delete()
                     }
                 }
                 if (result == InstallState.Installed && SyncService.autoUpdating) {

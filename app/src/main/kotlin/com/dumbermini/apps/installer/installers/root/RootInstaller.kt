@@ -3,11 +3,13 @@ package com.dumbermini.apps.installer.installers.root
 import android.content.Context
 import com.dumbermini.apps.data.model.PackageName
 import com.dumbermini.apps.installer.installers.Installer
+import com.dumbermini.apps.installer.installers.session.SessionInstaller
 import com.dumbermini.apps.installer.installers.uninstallPackage
 import com.dumbermini.apps.installer.model.InstallItem
 import com.dumbermini.apps.installer.model.InstallState
 import com.dumbermini.apps.utility.common.SdkCheck
 import com.dumbermini.apps.utility.common.cache.Cache
+import com.dumbermini.apps.utility.common.extension.isSplitApkArchive
 import com.topjohnwu.superuser.Shell
 import kotlin.coroutines.resume
 import kotlinx.coroutines.suspendCancellableCoroutine
@@ -16,20 +18,25 @@ class RootInstaller(private val context: Context) : Installer {
 
     override suspend fun install(
         installItem: InstallItem,
-    ): InstallState = suspendCancellableCoroutine { cont ->
+    ): InstallState {
         val releaseFile = Cache.getReleaseFile(context, installItem.installFileName)
-        val installCommand = INSTALL_COMMAND.format(
-            releaseFile.absolutePath,
-            currentUser(),
-            context.packageName,
-            releaseFile.length(),
-        )
-        Shell.cmd(installCommand).submit { shellResult ->
-            val result = if (shellResult.isSuccess) InstallState.Installed
-            else InstallState.Failed
-            cont.resume(result)
-            val deleteCommand = DELETE_COMMAND.format(utilBox(), releaseFile.absolutePath)
-            Shell.cmd(deleteCommand).submit()
+        if (context.isSplitApkArchive(releaseFile)) {
+            return SessionInstaller(context).use { it.install(installItem) }
+        }
+        return suspendCancellableCoroutine { cont ->
+            val installCommand = INSTALL_COMMAND.format(
+                releaseFile.absolutePath,
+                currentUser(),
+                context.packageName,
+                releaseFile.length(),
+            )
+            Shell.cmd(installCommand).submit { shellResult ->
+                val result = if (shellResult.isSuccess) InstallState.Installed
+                else InstallState.Failed
+                cont.resume(result)
+                val deleteCommand = DELETE_COMMAND.format(utilBox(), releaseFile.absolutePath)
+                Shell.cmd(deleteCommand).submit()
+            }
         }
     }
 
