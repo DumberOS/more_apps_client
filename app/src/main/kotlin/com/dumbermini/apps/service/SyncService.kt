@@ -18,9 +18,15 @@ import com.dumbermini.apps.database.Database
 import com.dumbermini.apps.datastore.Settings
 import com.dumbermini.apps.datastore.SettingsRepository
 import com.dumbermini.apps.index.RepositoryUpdater
+import com.dumbermini.apps.installer.InstallManager
+import com.dumbermini.apps.installer.model.installFrom
+import com.dumbermini.apps.model.Product
 import com.dumbermini.apps.model.ProductItem
 import com.dumbermini.apps.model.Repository
+import com.dumbermini.apps.model.findSuggested
 import com.dumbermini.apps.network.DataSize
+import com.dumbermini.apps.network.Downloader
+import com.dumbermini.apps.network.NetworkResponse
 import com.dumbermini.apps.network.percentBy
 import com.dumbermini.apps.receivers.CopyErrorReceiver
 import com.dumbermini.apps.utility.common.Constants
@@ -33,7 +39,9 @@ import com.dumbermini.apps.utility.common.extension.stopForegroundCompat
 import com.dumbermini.apps.utility.common.result.Result
 import com.dumbermini.apps.utility.common.sdkAbove
 import com.dumbermini.apps.utility.extension.startUpdate
+import com.dumbermini.apps.utility.extension.android.Android
 import com.dumbermini.apps.utility.notifications.updatesAvailableNotification
+import com.dumbermini.apps.utility.common.cache.Cache
 import com.dumbermini.apps.work.DownloadStatsWorker
 import com.dumbermini.apps.work.RBLogWorker
 import dagger.hilt.android.AndroidEntryPoint
@@ -80,6 +88,12 @@ class SyncService : ConnectionService<SyncService.Binder>() {
     @Inject
     lateinit var settingsRepository: SettingsRepository
 
+    @Inject
+    lateinit var downloader: Downloader
+
+    @Inject
+    lateinit var installer: InstallManager
+
     sealed class State(val name: String) {
         class Connecting(appName: String) : State(appName)
 
@@ -118,10 +132,18 @@ class SyncService : ConnectionService<SyncService.Binder>() {
     private var started = Started.NO
     private val tasks = mutableListOf<Task>()
     private var currentTask: CurrentTask? = null
+    private var pendingAutoUpdates: List<ProductItem>? = null
 
     private var updateNotificationBlockerFragment: WeakReference<Fragment>? = null
 
-    private val downloadConnection = Connection(DownloadService::class.java)
+    private val downloadConnection = Connection(
+        DownloadService::class.java,
+        onBind = { _, _ ->
+            val updates = pendingAutoUpdates ?: return@Connection
+            pendingAutoUpdates = null
+            lifecycleScope.launch { updateAllAppsInternal(updates) }
+        },
+    )
     private val lock = Mutex()
 
     enum class SyncRequest { AUTO, MANUAL, FORCE }
@@ -579,6 +601,26 @@ class SyncService : ConnectionService<SyncService.Binder>() {
     }
 
     private suspend fun updateAllAppsInternal(updates: List<ProductItem>) {
+        if (started == Started.AUTO) {
+            updates
+                .sortedBy { if (it.packageName == packageName) 1 else -1 }
+                .map {
+                    Database.InstalledAdapter.get(it.packageName, null) to
+                        Database.RepositoryAdapter.get(it.repositoryId)
+                }
+                .filter { it.first != null && it.second != null }
+                .forEach { (installItem, repo) ->
+                    val productRepo = Database.ProductAdapter.get(installItem!!.packageName, null)
+                        .filter { it.repositoryId == repo!!.id }
+                        .map { it to repo!! }
+                    autoUpdateDirectly(installItem.packageName, productRepo)
+                }
+            return
+        }
+        if (downloadConnection.binder == null) {
+            pendingAutoUpdates = updates
+            return
+        }
         updates
             // Update Droid-ify the last
             .sortedBy { if (it.packageName == packageName) 1 else -1 }
@@ -597,6 +639,48 @@ class SyncService : ConnectionService<SyncService.Binder>() {
                     productRepo,
                 )
             }
+    }
+
+    private suspend fun autoUpdateDirectly(
+        packageName: String,
+        products: List<Pair<Product, Repository>>,
+    ) {
+        if (products.isEmpty()) return
+
+        val installedItem = Database.InstalledAdapter.get(packageName, null)
+        val (product, repository) = products.findSuggested(installedItem) ?: return
+        val compatibleReleases = product.selectedReleases.ifEmpty { return }
+        val selectedRelease = compatibleReleases.singleOrNull() ?: compatibleReleases.run {
+            filter { Android.primaryPlatform in it.platforms }.minByOrNull { it.platforms.size }
+                ?: minByOrNull { it.platforms.size }
+                ?: firstOrNull()
+        } ?: return
+
+        val releaseFile = Cache.getReleaseFile(this, selectedRelease.cacheFileName)
+        if (!releaseFile.exists()) {
+            val partialFile = Cache.getPartialReleaseFile(this, selectedRelease.cacheFileName)
+            val validator = ReleaseFileValidator(this, packageName, selectedRelease)
+            when (
+                downloader.downloadToFile(
+                    url = selectedRelease.getDownloadUrl(repository),
+                    target = partialFile,
+                    validator = validator,
+                    headers = {
+                        if (repository.authentication.isNotEmpty()) {
+                            authentication(repository.authentication)
+                        }
+                    },
+                )
+            ) {
+                is NetworkResponse.Success -> partialFile.renameTo(releaseFile)
+                is NetworkResponse.Error -> {
+                    partialFile.delete()
+                    return
+                }
+            }
+        }
+
+        installer.install(packageName installFrom selectedRelease.cacheFileName)
     }
 
     @SuppressLint("SpecifyJobSchedulerIdRange")
@@ -645,6 +729,30 @@ class SyncService : ConnectionService<SyncService.Binder>() {
         }
 
         companion object {
+            fun minPeriodMillis(): Long = JobInfo.getMinPeriodMillis()
+
+            fun createOneShot(
+                context: Context,
+                jobId: Int,
+                networkType: Int,
+                isCharging: Boolean,
+                isBatteryLow: Boolean,
+                minLatencyMillis: Long = 0L,
+            ): JobInfo = JobInfo.Builder(
+                jobId,
+                ComponentName(context, Job::class.java),
+            ).apply {
+                setRequiredNetworkType(networkType)
+                sdkAbove(sdk = Build.VERSION_CODES.O) {
+                    setRequiresCharging(isCharging)
+                    setRequiresBatteryNotLow(isBatteryLow)
+                    setRequiresStorageNotLow(true)
+                }
+                if (minLatencyMillis > 0L) {
+                    setMinimumLatency(minLatencyMillis)
+                }
+            }.build()
+
             fun create(
                 context: Context,
                 periodMillis: Long,

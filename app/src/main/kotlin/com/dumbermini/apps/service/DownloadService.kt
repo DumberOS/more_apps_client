@@ -1,7 +1,9 @@
 package com.dumbermini.apps.service
 
+import android.Manifest
 import android.app.PendingIntent
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.graphics.Color
 import android.util.Log
 import androidx.core.app.NotificationCompat
@@ -27,7 +29,6 @@ import com.dumbermini.apps.utility.common.SdkCheck
 import com.dumbermini.apps.utility.common.cache.Cache
 import com.dumbermini.apps.utility.common.createNotificationChannel
 import com.dumbermini.apps.utility.common.extension.notificationManager
-import com.dumbermini.apps.utility.common.extension.startServiceCompat
 import com.dumbermini.apps.utility.common.extension.stopForegroundCompat
 import com.dumbermini.apps.utility.common.extension.toPendingIntent
 import com.dumbermini.apps.utility.common.extension.updateAsMutable
@@ -301,10 +302,18 @@ class DownloadService : ConnectionService<DownloadService.Binder>() {
         val currentInstaller = installerType.first()
         updateCurrentQueue { add("") }
         updateCurrentState(State.Success(task.packageName, task.release))
+        val hasSilentInstallPermission =
+            packageManager.checkPermission(
+                Manifest.permission.INSTALL_PACKAGES,
+                packageName,
+            ) == PackageManager.PERMISSION_GRANTED
         val autoInstallWithSessionInstaller =
-            SdkCheck.canAutoInstall(task.release.targetSdkVersion) &&
-                    currentInstaller == InstallerType.SESSION &&
-                    task.isUpdate
+            currentInstaller == InstallerType.SESSION &&
+                task.isUpdate &&
+                (
+                    hasSilentInstallPermission ||
+                        SdkCheck.canAutoInstall(task.release.targetSdkVersion)
+                    )
 
         showNotificationInstall(task)
         if (currentInstaller == InstallerType.ROOT ||
@@ -376,7 +385,6 @@ class DownloadService : ConnectionService<DownloadService.Binder>() {
         if (currentTask != null) return
         if (!started) {
             started = true
-            startServiceCompat()
         }
         if (tasks.isEmpty()) {
             if (started) started = false

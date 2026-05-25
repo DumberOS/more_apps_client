@@ -59,6 +59,7 @@ data class Repository(
     @Suppress("SpellCheckingInspection")
     companion object {
         const val DUMBER_OS_REPO_ADDRESS = "https://apps.dumbermini.com/repo/"
+        const val MICROG_REPO_ADDRESS = "https://microg.org/fdroid/repo"
 
         fun newRepository(
             address: String,
@@ -88,7 +89,7 @@ data class Repository(
             )
         }
 
-        val defaultRepositories = listOf(
+        fun defaultRepositories(microgEnabled: Boolean = true) = listOf(
             defaultRepository(
                 address = DUMBER_OS_REPO_ADDRESS,
                 name = "DumberOS apps",
@@ -144,12 +145,12 @@ data class Repository(
                 fingerprint = "3BF0D6ABFEAE2F401707B6D966BE743BF0EEE49C2561B9BA39073711F628937A",
             ),
             defaultRepository(
-                address = "https://microg.org/fdroid/repo",
+                address = MICROG_REPO_ADDRESS,
                 name = "microG Project",
                 description = "The official repository for microG." +
                     " microG is a lightweight open source implementation" +
                     " of Google Play Services.",
-                enabled = true,
+                enabled = microgEnabled,
                 fingerprint = "9BD06727E62796C0130EB6DAB39B73157451582CBD138E86C468ACC395D14165",
             ),
             defaultRepository(

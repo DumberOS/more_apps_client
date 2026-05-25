@@ -17,9 +17,7 @@ fun Connection<DownloadService.Binder, DownloadService>.startUpdate(
 
     val (product, repository) = products.findSuggested(installedItem) ?: return
 
-    val compatibleReleases = product.selectedReleases
-        .filter { installedItem == null || installedItem.signature == it.signature }
-        .ifEmpty { return }
+    val compatibleReleases = product.selectedReleases.ifEmpty { return }
 
     val selectedRelease = compatibleReleases.singleOrNull() ?: compatibleReleases.run {
         filter { Android.primaryPlatform in it.platforms }.minByOrNull { it.platforms.size }

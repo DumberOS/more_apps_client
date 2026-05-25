@@ -8,7 +8,6 @@ import com.dumbermini.apps.datastore.SettingsRepository
 import com.dumbermini.apps.datastore.get
 import com.dumbermini.apps.datastore.model.SortOrder
 import com.dumbermini.apps.model.ProductItem
-import com.dumbermini.apps.model.Repository
 import com.dumbermini.apps.ui.tabsFragment.TabsFragment.BackAction
 import com.dumbermini.apps.utility.common.extension.asStateFlow
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -23,9 +22,6 @@ class TabsViewModel @Inject constructor(
     private val settingsRepository: SettingsRepository,
     private val savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
-
-    private var shouldInitializeRecommendedSection = !savedStateHandle.contains(STATE_SECTION)
-
     val currentSection =
         savedStateHandle.getStateFlow<ProductItem.Section>(STATE_SECTION, ProductItem.Section.All)
 
@@ -42,7 +38,6 @@ class TabsViewModel @Inject constructor(
             Database.CategoryAdapter.getAllStream(),
             Database.RepositoryAdapter.getEnabledStream(),
         ) { categories, repos ->
-            val recommendedRepo = repos.find { it.address == Repository.DUMBER_OS_REPO_ADDRESS }
             val productCategories = categories
                 .asSequence()
                 .sorted()
@@ -51,13 +46,8 @@ class TabsViewModel @Inject constructor(
 
             val enabledRepositories = repos
                 .map { ProductItem.Section.Repository(it.id, it.name) }
-            if (shouldInitializeRecommendedSection && recommendedRepo != null) {
-                shouldInitializeRecommendedSection = false
-                setSection(ProductItem.Section.Recommended(recommendedRepo.id))
-            }
             enabledRepositories.ifEmpty { setSection(ProductItem.Section.All) }
             buildList {
-                recommendedRepo?.let { add(ProductItem.Section.Recommended(it.id)) }
                 add(ProductItem.Section.All)
                 addAll(productCategories)
                 addAll(enabledRepositories)
@@ -84,7 +74,6 @@ class TabsViewModel @Inject constructor(
     }.asStateFlow(BackAction.None)
 
     fun setSection(section: ProductItem.Section) {
-        shouldInitializeRecommendedSection = false
         savedStateHandle[STATE_SECTION] = section
     }
 

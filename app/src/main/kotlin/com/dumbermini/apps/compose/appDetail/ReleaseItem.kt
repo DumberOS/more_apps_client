@@ -71,8 +71,7 @@ fun ReleaseItem(
         if (release.platforms.size == 1) release.platforms.first() else null
     }
     val installed = remember(release, installedItem) {
-        installedItem?.versionCode == release.versionCode &&
-                installedItem.signature == release.signature
+        installedItem?.versionCode == release.versionCode
     }
 
     Card(

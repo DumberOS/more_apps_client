@@ -29,6 +29,7 @@ import com.dumbermini.apps.compose.settings.navigation.settings
 import com.dumbermini.apps.compose.theme.DroidifyTheme
 import com.dumbermini.apps.data.RepoRepository
 import com.dumbermini.apps.model.Repository
+import com.dumbermini.apps.utility.common.device.DumbdroidBuild
 import com.dumbermini.apps.utility.common.requestNotificationPermission
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
@@ -48,7 +49,9 @@ class MainComposeActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         lifecycleScope.launch {
             if (repository.repos.first().isEmpty()) {
-                Repository.defaultRepositories.forEach {
+                Repository.defaultRepositories(
+                    microgEnabled = !DumbdroidBuild.isGapps,
+                ).forEach {
                     repository.insertRepo(it.address, it.fingerprint, null, null, it.name, it.description)
                 }
             }

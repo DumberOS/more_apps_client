@@ -504,7 +504,6 @@ class TabsFragment : ScreenFragment() {
 
     private fun updateSection(section: ProductItem.Section) {
         layout?.sectionName?.text = when (section) {
-            is ProductItem.Section.Recommended -> getString(stringRes.recommended_for_dumberos)
             is ProductItem.Section.All -> getString(stringRes.all_applications)
             is ProductItem.Section.Category -> section.name
             is ProductItem.Section.Repository -> section.name
@@ -724,10 +723,6 @@ class TabsFragment : ScreenFragment() {
                 0
             }
             holder.title.text = when (section) {
-                is ProductItem.Section.Recommended -> holder.itemView.resources.getString(
-                    stringRes.recommended_for_dumberos,
-                )
-
                 is ProductItem.Section.All -> holder.itemView.resources.getString(
                     stringRes.all_applications,
                 )

@@ -10,6 +10,7 @@ import com.dumbermini.apps.database.Database.jsonParse
 import com.dumbermini.apps.database.Database.query
 import com.dumbermini.apps.index.OemRepositoryParser
 import com.dumbermini.apps.model.Repository
+import com.dumbermini.apps.utility.common.device.DumbdroidBuild
 import com.dumbermini.apps.utility.common.extension.asSequence
 import com.dumbermini.apps.utility.common.extension.firstOrNull
 import com.dumbermini.apps.utility.serialization.repository
@@ -71,7 +72,7 @@ class DatabaseHelper(context: Context) :
     }
 
     private fun SQLiteDatabase.addDefaultRepositories() {
-        (Repository.defaultRepositories + Repository.newRepos())
+        (Repository.defaultRepositories(microgEnabled = !DumbdroidBuild.isGapps) + Repository.newRepos())
             .sortedBy { it.name }
             .forEach { repo -> RepositoryAdapter.put(repo, database = this) }
     }

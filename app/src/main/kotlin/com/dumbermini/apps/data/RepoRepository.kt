@@ -182,23 +182,21 @@ class RepoRepository @Inject constructor(
         }
     }
 
+    suspend fun disableRepoByAddress(address: String): Boolean {
+        val repo = repoDao.getRepoByAddress(address) ?: return false
+        if (!settingsRepository.isRepoEnabled(repo.id)) return false
+
+        settingsRepository.setRepoEnabled(repo.id, false)
+        disableRepository(repo.id)
+        return true
+    }
+
     suspend fun enableRepository(repo: Repo, enable: Boolean) {
         settingsRepository.setRepoEnabled(repo.id, enable)
         if (enable) {
             SyncWorker.syncRepo(context, repo.id)
         } else {
-            repoDao.resetTimestamp(repo.id)
-            runCatching {
-                val indexDir = File(context.cacheDir, "index")
-                if (indexDir.exists()) {
-                    indexDir.listFiles()?.forEach { file ->
-                        if (file.name.startsWith("repo_${repo.id}_")) {
-                            file.delete()
-                        }
-                    }
-                }
-            }
-            appDao.deleteByRepoId(repo.id)
+            disableRepository(repo.id)
         }
     }
 
@@ -236,4 +234,19 @@ class RepoRepository @Inject constructor(
 
     private suspend fun getMirrors(repoId: Int): List<String> =
         repoDao.mirrors(repoId).map { it.url }
+
+    private suspend fun disableRepository(repoId: Int) {
+        repoDao.resetTimestamp(repoId)
+        runCatching {
+            val indexDir = File(context.cacheDir, "index")
+            if (indexDir.exists()) {
+                indexDir.listFiles()?.forEach { file ->
+                    if (file.name.startsWith("repo_${repoId}_")) {
+                        file.delete()
+                    }
+                }
+            }
+        }
+        appDao.deleteByRepoId(repoId)
+    }
 }

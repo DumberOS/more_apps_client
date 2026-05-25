@@ -22,6 +22,9 @@ interface RepoDao {
     @Query("SELECT * FROM repository WHERE id = :repoId")
     suspend fun getRepo(repoId: Int): RepoEntity?
 
+    @Query("SELECT * FROM repository WHERE address = :address LIMIT 1")
+    suspend fun getRepoByAddress(address: String): RepoEntity?
+
     @Query("SELECT id, address FROM repository WHERE id IN (:ids)")
     suspend fun getAddressByIds(ids: List<Int>): Map<@MapColumn("id") Int, @MapColumn("address") String>
 

@@ -230,7 +230,7 @@ class PreferenceSettingsRepository(
         val ignoreSignature = preferences[IGNORE_SIGNATURE] ?: false
         val theme = Theme.valueOf(preferences[THEME] ?: Theme.SYSTEM.name)
         val dynamicTheme = preferences[DYNAMIC_THEME] ?: false
-        val autoUpdate = preferences[AUTO_UPDATE] ?: false
+        val autoUpdate = preferences[AUTO_UPDATE] ?: true
         val autoSync = AutoSync.valueOf(preferences[AUTO_SYNC] ?: AutoSync.WIFI_ONLY.name)
         val sortOrder = SortOrder.valueOf(preferences[SORT_ORDER] ?: SortOrder.UPDATED.name)
         val type = ProxyType.valueOf(preferences[PROXY_TYPE] ?: ProxyType.DIRECT.name)

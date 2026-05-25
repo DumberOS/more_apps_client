@@ -17,4 +17,5 @@ object Constants {
     const val NOTIFICATION_ID_INDEX_DOWNLOAD = 7
 
     const val JOB_ID_SYNC = 1
+    const val JOB_ID_SYNC_BOOTSTRAP = 2
 }

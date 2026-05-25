@@ -19,10 +19,6 @@ data class ProductItem(
     var matchRank: Int
 ) {
     sealed interface Section : Parcelable {
-
-        @Parcelize
-        data class Recommended(val id: Long) : Section
-
         @Parcelize
         data object All : Section
 

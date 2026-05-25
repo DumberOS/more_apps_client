@@ -12,15 +12,19 @@ import com.dumbermini.apps.utility.common.SdkCheck
 val PackageInfo.singleSignature: Signature?
     get() = if (SdkCheck.isPie) {
         val signingInfo = signingInfo
-        if (signingInfo?.hasMultipleSigners() == false) {
-            signingInfo.apkContentsSigners
-                ?.let { if (it.size == 1) it[0] else null }
-        } else {
-            null
-        }
+        when {
+            signingInfo?.hasMultipleSigners() == false -> signingInfo.apkContentsSigners
+                ?.singleOrNull()
+                ?: signingInfo.signingCertificateHistory?.singleOrNull()
+
+            signingInfo?.hasMultipleSigners() == true -> signingInfo.apkContentsSigners
+                ?.singleOrNull()
+
+            else -> null
+        } ?: @Suppress("DEPRECATION") signatures?.singleOrNull()
     } else {
         @Suppress("DEPRECATION")
-        signatures?.let { if (it.size == 1) it[0] else null }
+        signatures?.singleOrNull()
     }
 
 fun Signature.calculateHash() = sha256(toByteArray()).hex()

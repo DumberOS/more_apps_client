@@ -34,7 +34,7 @@ data class Settings(
     val dynamicTheme: Boolean = false,
     val installerType: InstallerType = InstallerType.Default,
     val legacyInstallerComponent: LegacyInstallerComponent? = null,
-    val autoUpdate: Boolean = false,
+    val autoUpdate: Boolean = true,
     val autoSync: AutoSync = AutoSync.WIFI_ONLY,
     val sortOrder: SortOrder = SortOrder.UPDATED,
     val proxy: ProxyPreference = ProxyPreference(),

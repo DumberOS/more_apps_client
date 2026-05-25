@@ -107,8 +107,7 @@ data class Product(
     }
 
     fun canUpdate(installedItem: InstalledItem?): Boolean {
-        return installedItem != null && compatible && versionCode > installedItem.versionCode &&
-                installedItem.signature in signatures
+        return installedItem != null && compatible && versionCode > installedItem.versionCode
     }
 }
 
@@ -116,10 +115,7 @@ fun List<Pair<Product, Repository>>.findSuggested(
     installedItem: InstalledItem?,
 ): Pair<Product, Repository>? = maxWithOrNull(
     compareBy(
-        { (product, _) ->
-            val isSameSignature = installedItem == null || installedItem.signature in product.signatures
-            product.compatible && (isSameSignature)
-        },
+        { (product, _) -> product.compatible },
         { (product, _) ->
             product.versionCode
         }

@@ -279,10 +279,6 @@ class AppDetailFragment() : ScreenFragment(), AppDetailAdapter.Callbacks {
                     }
                 }
 
-                installedItem != null && selectedRelease != null && installedItem.signature != selectedRelease.signature -> {
-                    getString(stringRes.incompatible_signature_DESC)
-                }
-
                 else -> null
             }
         } else {
@@ -555,16 +551,6 @@ class AppDetailFragment() : ScreenFragment(), AppDetailAdapter.Callbacks {
 
             installedItem != null && installedItem.versionCode > release.versionCode -> {
                 MessageDialog(Message.ReleaseOlder).show(childFragmentManager)
-            }
-
-            installedItem != null && installedItem.signature != release.signature -> {
-                lifecycleScope.launch {
-                    if (viewModel.shouldIgnoreSignature()) {
-                        queueReleaseInstall(release, installedItem)
-                    } else {
-                        MessageDialog(Message.ReleaseSignatureMismatch).show(childFragmentManager)
-                    }
-                }
             }
 
             else -> {

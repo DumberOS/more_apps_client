@@ -514,10 +514,7 @@ object Database {
         ): Cursor {
             val builder = QueryBuilder()
 
-            val signatureMatches = if (skipSignatureCheck) "1"
-            else """installed.${Schema.Installed.ROW_SIGNATURE} IS NOT NULL AND
-                product.${Schema.Product.ROW_SIGNATURES} LIKE ('%.' || installed.${Schema.Installed.ROW_SIGNATURE} || '.%') AND
-                product.${Schema.Product.ROW_SIGNATURES} != ''"""
+            val signatureMatches = "1"
 
             builder += """SELECT product.rowid AS _id, product.${Schema.Product.ROW_REPOSITORY_ID},
         product.${Schema.Product.ROW_PACKAGE_NAME}, product.${Schema.Product.ROW_NAME},
@@ -539,7 +536,7 @@ object Database {
             }
 
             builder += """MAX((product.${Schema.Product.ROW_COMPATIBLE} AND
-        (installed.${Schema.Installed.ROW_SIGNATURE} IS NULL OR $signatureMatches)) ||
+        $signatureMatches) ||
         PRINTF('%016X', product.${Schema.Product.ROW_VERSION_CODE})) FROM ${Schema.Product.name} AS product"""
             builder += """JOIN ${Schema.Repository.name} AS repository
         ON product.${Schema.Product.ROW_REPOSITORY_ID} = repository.${Schema.Repository.ROW_ID}"""
@@ -563,9 +560,6 @@ object Database {
             if (section is ProductItem.Section.Category) {
                 builder += "AND category.${Schema.Category.ROW_NAME} = ?"
                 builder %= section.name
-            } else if (section is ProductItem.Section.Recommended) {
-                builder += "AND product.${Schema.Product.ROW_REPOSITORY_ID} = ?"
-                builder %= section.id.toString()
             } else if (section is ProductItem.Section.Repository) {
                 builder += "AND product.${Schema.Product.ROW_REPOSITORY_ID} = ?"
                 builder %= section.id.toString()
