@@ -513,6 +513,14 @@ object Database {
             signal: CancellationSignal?,
         ): Cursor {
             val builder = QueryBuilder()
+            val preferredRepositoryIds = if (section == ProductItem.Section.All) {
+                val repositoriesByAddress = RepositoryAdapter.getAll()
+                    .associateBy { Repository.normalizeAddress(it.address) }
+                Repository.PREFERRED_REPO_ADDRESSES
+                    .mapNotNull { repositoriesByAddress[Repository.normalizeAddress(it)]?.id }
+            } else {
+                emptyList()
+            }
 
             val signatureMatches = "1"
 
@@ -578,6 +586,16 @@ object Database {
 
             if (searchQuery.isNotEmpty()) {
                 builder += """${Schema.Synthetic.ROW_MATCH_RANK} DESC,"""
+            }
+            if (preferredRepositoryIds.isNotEmpty()) {
+                builder += buildString {
+                    append("CASE")
+                    preferredRepositoryIds.forEachIndexed { index, _ ->
+                        append(" WHEN product.${Schema.Product.ROW_REPOSITORY_ID} = ? THEN $index")
+                    }
+                    append(" ELSE ${preferredRepositoryIds.size} END,")
+                }
+                builder %= preferredRepositoryIds.map(Long::toString)
             }
 
             when (order) {

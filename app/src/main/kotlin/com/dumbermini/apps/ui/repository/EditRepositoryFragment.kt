@@ -3,7 +3,6 @@ package com.dumbermini.apps.ui.repository
 import android.os.Bundle
 import android.text.Selection
 import android.util.Base64
-import android.view.MenuItem
 import android.view.View
 import android.view.ViewGroup
 import androidx.appcompat.app.AlertDialog
@@ -29,7 +28,6 @@ import com.dumbermini.apps.ui.ScreenFragment
 import com.dumbermini.apps.utility.common.extension.clipboardManager
 import com.dumbermini.apps.utility.common.extension.exceptCancellation
 import com.dumbermini.apps.utility.common.extension.get
-import com.dumbermini.apps.utility.common.extension.getMutatedIcon
 import com.dumbermini.apps.utility.common.nullIfEmpty
 import com.dumbermini.apps.utility.extension.mainActivity
 import dagger.hilt.android.AndroidEntryPoint
@@ -64,8 +62,6 @@ class EditRepositoryFragment() : ScreenFragment() {
     private val repoAddress: String?
         get() = arguments?.getString(EXTRA_REPOSITORY_ADDRESS)
 
-    private var saveMenuItem: MenuItem? = null
-
     private val syncConnection = Connection(SyncService::class.java)
     private var checkInProgress = false
     private var checkJob: Job? = null
@@ -85,14 +81,6 @@ class EditRepositoryFragment() : ScreenFragment() {
         mainActivity.onToolbarCreated(toolbar)
         toolbar.title =
             getString(if (repoId != null) stringRes.edit_repository else stringRes.add_repository)
-
-        saveMenuItem = toolbar.menu.add(stringRes.save)
-            .setIcon(toolbar.context.getMutatedIcon(R.drawable.ic_save))
-            .setEnabled(false)
-            .setShowAsActionFlags(MenuItem.SHOW_AS_ACTION_ALWAYS).setOnMenuItemClickListener {
-                onSaveRepositoryClick(true)
-                true
-            }
 
         val content = fragmentBinding.fragmentContent
 
@@ -220,6 +208,7 @@ class EditRepositoryFragment() : ScreenFragment() {
                 onSaveRepositoryClick(false)
             }
         }
+        binding.save.setOnClickListener { onSaveRepositoryClick(true) }
 
         viewLifecycleOwner.lifecycleScope.launch {
             val list = Database.RepositoryAdapter.getAll()
@@ -237,7 +226,6 @@ class EditRepositoryFragment() : ScreenFragment() {
     override fun onDestroyView() {
         super.onDestroyView()
 
-        saveMenuItem = null
         syncConnection.unbind(requireContext())
         checkJob?.cancel()
         checkJob = null
@@ -301,10 +289,10 @@ class EditRepositoryFragment() : ScreenFragment() {
     }
 
     private fun invalidateState() {
-        saveMenuItem!!.isEnabled =
+        binding.save.isEnabled =
             !addressError && !fingerprintError && !usernamePasswordError && !checkInProgress
         binding.apply {
-            sequenceOf(address, fingerprint, username, password).forEach {
+            sequenceOf(address, fingerprint, username, password, save).forEach {
                 it.isEnabled = !checkInProgress
             }
         }

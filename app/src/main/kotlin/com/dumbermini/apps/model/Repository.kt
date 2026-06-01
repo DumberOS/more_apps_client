@@ -58,8 +58,22 @@ data class Repository(
 
     @Suppress("SpellCheckingInspection")
     companion object {
-        const val DUMBER_OS_REPO_ADDRESS = "https://apps.dumbermini.com/repo/"
+        val PREFERRED_REPO_ADDRESSES = arrayOf(
+            "https://apps.dumbermini.com/repo/",
+            "https://apps.dumbermini.com/romobil/repo/",
+        )
         const val MICROG_REPO_ADDRESS = "https://microg.org/fdroid/repo"
+
+        fun normalizeAddress(address: String): String = address.trim().trimEnd('/')
+
+        fun preferredRepoRank(address: String): Int {
+            val normalizedAddress = normalizeAddress(address)
+            return PREFERRED_REPO_ADDRESSES.indexOfFirst {
+                normalizeAddress(it) == normalizedAddress
+            }
+        }
+
+        fun isPreferredRepoAddress(address: String): Boolean = preferredRepoRank(address) >= 0
 
         fun newRepository(
             address: String,
@@ -91,7 +105,7 @@ data class Repository(
 
         fun defaultRepositories(microgEnabled: Boolean = true) = listOf(
             defaultRepository(
-                address = DUMBER_OS_REPO_ADDRESS,
+                address = PREFERRED_REPO_ADDRESSES.first(),
                 name = "DumberOS apps",
                 description = "Official repo with more apps for DumberOS.",
                 enabled = true,

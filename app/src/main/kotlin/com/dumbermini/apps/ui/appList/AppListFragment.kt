@@ -89,6 +89,7 @@ class AppListFragment() : Fragment(), CursorOwner.Callback {
             setHasFixedSize(true)
             recycledViewPool.setMaxRecycledViews(AppListAdapter.ViewType.PRODUCT.ordinal, 30)
             appListAdapter = AppListAdapter(source, mainActivity::navigateProduct)
+            appListAdapter.searchQuery = searchQuery
             adapter = appListAdapter
             systemBarsPadding()
         }
@@ -139,6 +140,7 @@ class AppListFragment() : Fragment(), CursorOwner.Callback {
         layoutManagerState = savedInstanceState?.getParcelable(STATE_LAYOUT_MANAGER)
         pendingSection?.let(viewModel::setSection)
         pendingSection = null
+        appListAdapter.currentSection = viewModel.state.value.sections
         mainActivity.cursorOwner.attach(
             callback = this,
             request = viewModel.state.value.toRequest(source, searchQuery),
@@ -152,6 +154,7 @@ class AppListFragment() : Fragment(), CursorOwner.Callback {
                 }
                 launch {
                     viewModel.state.collect {
+                        appListAdapter.currentSection = it.sections
                         mainActivity.cursorOwner.attach(
                             callback = this@AppListFragment,
                             request = it.toRequest(source, searchQuery),
@@ -202,6 +205,7 @@ class AppListFragment() : Fragment(), CursorOwner.Callback {
     fun setSearchQuery(newSearchQuery: String) {
         searchQuery = newSearchQuery
         if (view != null) {
+            appListAdapter.searchQuery = newSearchQuery
             mainActivity.cursorOwner.attach(
                 callback = this,
                 request = viewModel.state.value.toRequest(source, searchQuery),
