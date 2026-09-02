@@ -39,11 +39,22 @@ import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.withContext
 
 object Database {
-    fun init(context: Context): Boolean {
+    data class InitState(
+        val created: Boolean,
+        val updated: Boolean,
+    ) {
+        val changed: Boolean
+            get() = created || updated
+    }
+
+    fun init(context: Context): InitState {
         val helper = DatabaseHelper(context)
         db = helper.writableDatabase
         RepositoryAdapter.removeDuplicates()
-        return helper.created || helper.updated
+        return InitState(
+            created = helper.created,
+            updated = helper.updated,
+        )
     }
 
     private lateinit var db: SQLiteDatabase

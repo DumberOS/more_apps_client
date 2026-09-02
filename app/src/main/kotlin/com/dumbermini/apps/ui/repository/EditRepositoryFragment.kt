@@ -49,15 +49,17 @@ import com.dumbermini.apps.R.string as stringRes
 class EditRepositoryFragment() : ScreenFragment() {
 
     constructor(repositoryId: Long?, repoAddress: String?) : this() {
-        arguments =
-            bundleOf(EXTRA_REPOSITORY_ID to repositoryId, EXTRA_REPOSITORY_ADDRESS to repoAddress)
+        arguments = Bundle().apply {
+            repositoryId?.let { putLong(EXTRA_REPOSITORY_ID, it) }
+            repoAddress?.let { putString(EXTRA_REPOSITORY_ADDRESS, it) }
+        }
     }
 
     private var _binding: EditRepositoryBinding? = null
     private val binding get() = _binding!!
 
     private val repoId: Long?
-        get() = arguments?.getLong(EXTRA_REPOSITORY_ID)
+        get() = arguments?.get(EXTRA_REPOSITORY_ID) as? Long
 
     private val repoAddress: String?
         get() = arguments?.getString(EXTRA_REPOSITORY_ADDRESS)

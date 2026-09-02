@@ -86,7 +86,7 @@ class Droidify : Application(), SingletonImageLoader.Factory, Configuration.Prov
     override fun onCreate() {
         super.onCreate()
 
-        val databaseUpdated = Database.init(this)
+        val databaseInit = Database.init(this)
         runBlocking { disableMicrogRepoOnGapps() }
         ProductPreferences.init(this, appScope)
         RepositoryUpdater.init(appScope, downloader)
@@ -95,7 +95,13 @@ class Droidify : Application(), SingletonImageLoader.Factory, Configuration.Prov
         updatePreference()
         appScope.launch { installer() }
 
-        if (databaseUpdated) {
+        if (databaseInit.created) {
+            appScope.launch {
+                forceSyncAll()
+            }
+        }
+
+        if (databaseInit.changed) {
             appScope.launch {
                 scheduleBootstrapSync(this@Droidify, settingsRepository.getInitial().autoSync)
             }
