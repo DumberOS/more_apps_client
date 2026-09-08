@@ -41,7 +41,7 @@ class AppListViewModel @Inject constructor(
     val favouritesOnly: StateFlow<Boolean> = _favouritesOnly
     private val favouriteApps: Flow<Set<String>> = settingsRepository.get { favouriteApps }.distinctUntilChanged()
 
-    val sortOrderFlow = settingsRepository.get { sortOrder }.asStateFlow(SortOrder.UPDATED)
+    val sortOrderFlow = settingsRepository.get { sortOrder }.asStateFlow(SortOrder.POPULARITY)
 
     @OptIn(ExperimentalCoroutinesApi::class)
     val appsState: StateFlow<List<AppMinimal>> = combine(

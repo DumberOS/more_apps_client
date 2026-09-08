@@ -715,6 +715,10 @@ class SyncService : ConnectionService<SyncService.Binder>() {
             )
 
         override fun onStartJob(params: JobParameters): Boolean {
+            // A bootstrap sync and the periodic sync can become ready at the same time.
+            // They both request the same AUTO work, so keep the first one instead of
+            // replacing its parameters and binding the shared connection twice.
+            if (syncParams != null) return false
             syncParams = params
             syncConnection.bind(this)
             return true

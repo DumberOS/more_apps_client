@@ -36,7 +36,7 @@ data class Settings(
     val legacyInstallerComponent: LegacyInstallerComponent? = null,
     val autoUpdate: Boolean = true,
     val autoSync: AutoSync = AutoSync.WIFI_ONLY,
-    val sortOrder: SortOrder = SortOrder.UPDATED,
+    val sortOrder: SortOrder = SortOrder.POPULARITY,
     val proxy: ProxyPreference = ProxyPreference(),
     val cleanUpInterval: Duration = 12.hours,
     @Contextual

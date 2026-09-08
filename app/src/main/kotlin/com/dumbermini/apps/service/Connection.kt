@@ -13,6 +13,7 @@ class Connection<B : IBinder, S : ConnectionService<B>>(
 ) : ServiceConnection {
     var binder: B? = null
         private set
+    private var isBound = false
 
     private fun handleUnbind() {
         binder?.let {
@@ -33,10 +34,18 @@ class Connection<B : IBinder, S : ConnectionService<B>>(
     }
 
     fun bind(context: Context) {
-        context.bindService(Intent(context, serviceClass), this, Context.BIND_AUTO_CREATE)
+        if (!isBound) {
+            isBound = context.bindService(
+                Intent(context, serviceClass),
+                this,
+                Context.BIND_AUTO_CREATE,
+            )
+        }
     }
 
     fun unbind(context: Context) {
+        if (!isBound) return
+        isBound = false
         context.unbindService(this)
         handleUnbind()
     }

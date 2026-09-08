@@ -30,6 +30,7 @@ fun Product.serialize(generator: JsonGenerator) {
     generator.writeStringField(TRACKER, tracker)
     generator.writeNumberField(ADDED, added)
     generator.writeNumberField(UPDATED, updated)
+    generator.writeNumberField(POPULARITY, popularity)
     generator.writeNumberField(SUGGESTEDVERSIONCODE, suggestedVersionCode)
     generator.writeArray(CATEGORIES) { categories.forEach(::writeString) }
     generator.writeArray(ANTIFEATURES) { antiFeatures.forEach(::writeString) }
@@ -96,6 +97,7 @@ fun JsonParser.product(): Product {
     var tracker = KEY_EMPTY
     var added = 0L
     var updated = 0L
+    var popularity = 0L
     var suggestedVersionCode = 0L
     var categories = emptyList<String>()
     var antiFeatures = emptyList<String>()
@@ -122,6 +124,7 @@ fun JsonParser.product(): Product {
             key.string(TRACKER) -> tracker = valueAsString
             key.number(ADDED) -> added = valueAsLong
             key.number(UPDATED) -> updated = valueAsLong
+            key.number(POPULARITY) -> popularity = valueAsLong
             key.number(SUGGESTEDVERSIONCODE) -> suggestedVersionCode = valueAsLong
             key.array(CATEGORIES) -> categories = collectNotNullStrings()
             key.array(ANTIFEATURES) -> antiFeatures = collectNotNullStrings()
@@ -191,6 +194,7 @@ fun JsonParser.product(): Product {
         tracker = tracker,
         added = added,
         updated = updated,
+        popularity = popularity,
         suggestedVersionCode = suggestedVersionCode,
         categories = categories,
         antiFeatures = antiFeatures,
@@ -219,6 +223,7 @@ private const val WEB = "web"
 private const val TRACKER = "tracker"
 private const val ADDED = "added"
 private const val UPDATED = "updated"
+private const val POPULARITY = "popularity"
 private const val SUGGESTEDVERSIONCODE = "suggestedVersionCode"
 private const val CATEGORIES = "categories"
 private const val ANTIFEATURES = "antiFeatures"

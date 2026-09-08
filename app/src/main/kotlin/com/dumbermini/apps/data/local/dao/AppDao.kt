@@ -209,11 +209,13 @@ interface AppDao {
             }
 
             when (sortOrder) {
-                SortOrder.UPDATED -> append("app.lastUpdated DESC")
-                SortOrder.ADDED -> append("app.added DESC")
-                SortOrder.SIZE -> append("version.apk_size DESC")
+                SortOrder.POPULARITY -> append("app.popularity DESC, ")
+                SortOrder.UPDATED -> append("app.lastUpdated DESC, ")
+                SortOrder.ADDED -> append("app.added DESC, ")
+                SortOrder.SIZE -> append("version.apk_size DESC, ")
                 SortOrder.NAME -> Unit
             }
+            append("COALESCE(n_loc.name, n_en.name) COLLATE NOCASE ASC")
         }
 
         return SimpleSQLiteQuery(query, args.toTypedArray())

@@ -114,6 +114,7 @@ private fun AppV1.toV2(preferredSigner: String?): MetadataV2 = MetadataV2(
     license = license,
     litecoin = litecoin,
     openCollective = openCollective,
+    popularity = popularity,
     preferredSigner = preferredSigner,
     promoGraphic = localized?.localizedIcon(packageName) { it.promoGraphic },
     screenshots = localized?.screenshotV2(packageName),

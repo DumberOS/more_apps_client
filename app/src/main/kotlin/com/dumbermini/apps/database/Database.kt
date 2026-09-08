@@ -50,6 +50,9 @@ object Database {
     fun init(context: Context): InitState {
         val helper = DatabaseHelper(context)
         db = helper.writableDatabase
+        if (helper.updated) {
+            RepositoryAdapter.invalidateIndexValidators()
+        }
         RepositoryAdapter.removeDuplicates()
         return InitState(
             created = helper.created,
@@ -84,6 +87,7 @@ object Database {
             const val ROW_DESCRIPTION = "description"
             const val ROW_ADDED = "added"
             const val ROW_UPDATED = "updated"
+            const val ROW_POPULARITY = "popularity"
             const val ROW_VERSION_CODE = "version_code"
             const val ROW_SIGNATURES = "signatures"
             const val ROW_COMPATIBLE = "compatible"
@@ -100,6 +104,7 @@ object Database {
         $ROW_DESCRIPTION TEXT NOT NULL,
         $ROW_ADDED INTEGER NOT NULL,
         $ROW_UPDATED INTEGER NOT NULL,
+        $ROW_POPULARITY INTEGER NOT NULL,
         $ROW_VERSION_CODE INTEGER NOT NULL,
         $ROW_SIGNATURES TEXT NOT NULL,
         $ROW_COMPATIBLE INTEGER NOT NULL,
@@ -275,6 +280,21 @@ object Database {
             val id = if (shouldReplace) repository.id else newId
             notifyChanged(Subject.Repositories, Subject.Repository(id), Subject.Products)
             return if (newId != repository.id) repository.copy(id = newId) else repository
+        }
+
+        fun invalidateIndexValidators() {
+            db.transaction {
+                getAll().forEach { repository ->
+                    if (repository.lastModified.isNotEmpty() || repository.entityTag.isNotEmpty()) {
+                        putWithoutNotification(
+                            repository.copy(lastModified = "", entityTag = ""),
+                            shouldReplace = true,
+                            database = db,
+                        )
+                    }
+                }
+            }
+            notifyChanged(Subject.Repositories)
         }
 
         fun removeDuplicates() {
@@ -524,14 +544,6 @@ object Database {
             signal: CancellationSignal?,
         ): Cursor {
             val builder = QueryBuilder()
-            val preferredRepositoryIds = if (section == ProductItem.Section.All) {
-                val repositoriesByAddress = RepositoryAdapter.getAll()
-                    .associateBy { Repository.normalizeAddress(it.address) }
-                Repository.PREFERRED_REPO_ADDRESSES
-                    .mapNotNull { repositoriesByAddress[Repository.normalizeAddress(it)]?.id }
-            } else {
-                emptyList()
-            }
 
             val signatureMatches = "1"
 
@@ -598,18 +610,10 @@ object Database {
             if (searchQuery.isNotEmpty()) {
                 builder += """${Schema.Synthetic.ROW_MATCH_RANK} DESC,"""
             }
-            if (preferredRepositoryIds.isNotEmpty()) {
-                builder += buildString {
-                    append("CASE")
-                    preferredRepositoryIds.forEachIndexed { index, _ ->
-                        append(" WHEN product.${Schema.Product.ROW_REPOSITORY_ID} = ? THEN $index")
-                    }
-                    append(" ELSE ${preferredRepositoryIds.size} END,")
-                }
-                builder %= preferredRepositoryIds.map(Long::toString)
-            }
 
             when (order) {
+                SortOrder.POPULARITY -> builder +=
+                    "product.${Schema.Product.ROW_POPULARITY} DESC,"
                 SortOrder.UPDATED -> builder += "product.${Schema.Product.ROW_UPDATED} DESC,"
                 SortOrder.ADDED -> builder += "product.${Schema.Product.ROW_ADDED} DESC,"
                 else -> Unit
@@ -816,6 +820,7 @@ object Database {
                             put(Schema.Product.ROW_DESCRIPTION, product.description)
                             put(Schema.Product.ROW_ADDED, product.added)
                             put(Schema.Product.ROW_UPDATED, product.updated)
+                            put(Schema.Product.ROW_POPULARITY, product.popularity)
                             put(Schema.Product.ROW_VERSION_CODE, product.versionCode)
                             put(Schema.Product.ROW_SIGNATURES, signatures)
                             put(Schema.Product.ROW_COMPATIBLE, if (product.compatible) 1 else 0)
@@ -854,13 +859,33 @@ object Database {
                         "${Schema.Category.ROW_REPOSITORY_ID} = ?",
                         arrayOf(repository.id.toString()),
                     )
+                    val productColumns = listOf(
+                        Schema.Product.ROW_REPOSITORY_ID,
+                        Schema.Product.ROW_PACKAGE_NAME,
+                        Schema.Product.ROW_NAME,
+                        Schema.Product.ROW_SUMMARY,
+                        Schema.Product.ROW_DESCRIPTION,
+                        Schema.Product.ROW_ADDED,
+                        Schema.Product.ROW_UPDATED,
+                        Schema.Product.ROW_POPULARITY,
+                        Schema.Product.ROW_VERSION_CODE,
+                        Schema.Product.ROW_SIGNATURES,
+                        Schema.Product.ROW_COMPATIBLE,
+                        Schema.Product.ROW_DATA,
+                        Schema.Product.ROW_DATA_ITEM,
+                    ).joinToString(", ")
                     db.execSQL(
-                        "INSERT INTO ${Schema.Product.name} SELECT * " +
-                                "FROM ${Schema.Product.temporaryName}",
+                        "INSERT INTO ${Schema.Product.name} ($productColumns) " +
+                            "SELECT $productColumns FROM ${Schema.Product.temporaryName}",
                     )
+                    val categoryColumns = listOf(
+                        Schema.Category.ROW_REPOSITORY_ID,
+                        Schema.Category.ROW_PACKAGE_NAME,
+                        Schema.Category.ROW_NAME,
+                    ).joinToString(", ")
                     db.execSQL(
-                        "INSERT INTO ${Schema.Category.name} SELECT * " +
-                                "FROM ${Schema.Category.temporaryName}",
+                        "INSERT INTO ${Schema.Category.name} ($categoryColumns) " +
+                            "SELECT $categoryColumns FROM ${Schema.Category.temporaryName}",
                     )
                     RepositoryAdapter.putWithoutNotification(repository, true, db)
                     db.execSQL("DROP TABLE IF EXISTS ${Schema.Product.temporaryName}")

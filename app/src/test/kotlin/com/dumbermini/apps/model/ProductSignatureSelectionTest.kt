@@ -136,6 +136,7 @@ class ProductSignatureSelectionTest {
             tracker = "",
             added = 0L,
             updated = 0L,
+            popularity = 0L,
             suggestedVersionCode = versionCode,
             categories = emptyList(),
             antiFeatures = emptyList(),

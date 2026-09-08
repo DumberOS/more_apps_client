@@ -60,6 +60,7 @@ fun Configuration.getThemeRes(theme: Theme, dynamicTheme: Boolean) = when (theme
 
 fun Context?.sortOrderName(sortOrder: SortOrder) = this?.let {
     when (sortOrder) {
+        SortOrder.POPULARITY -> getString(stringRes.popularity)
         SortOrder.UPDATED -> getString(stringRes.recently_updated)
         SortOrder.ADDED -> getString(stringRes.whats_new)
         SortOrder.NAME -> getString(stringRes.name)

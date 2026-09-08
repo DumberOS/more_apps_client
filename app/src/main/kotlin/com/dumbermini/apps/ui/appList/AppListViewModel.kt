@@ -36,7 +36,7 @@ class AppListViewModel
 
     private val sortOrderFlow = settingsRepository
         .get { sortOrder }
-        .asStateFlow(SortOrder.UPDATED)
+        .asStateFlow(SortOrder.POPULARITY)
 
     private val sections = MutableStateFlow<ProductItem.Section>(All)
 
@@ -81,7 +81,7 @@ class AppListViewModel
 
 data class AppListState(
     val sections: ProductItem.Section = All,
-    val sortOrder: SortOrder = SortOrder.UPDATED,
+    val sortOrder: SortOrder = SortOrder.POPULARITY,
     val skipSignatureCheck: Boolean = false,
 ) {
     fun toRequest(source: AppListFragment.Source, searchQuery: String) = when (source) {

@@ -26,6 +26,7 @@ data class AppV1(
     val donate: String? = null,
     val issueTracker: String? = null,
     val lastUpdated: Long? = null,
+    val popularity: Long = 0,
     val liberapay: String? = null,
     val liberapayID: String? = null,
     val license: String,
@@ -37,4 +38,3 @@ data class AppV1(
     val translation: String? = null,
     val webSite: String? = null,
 )
-

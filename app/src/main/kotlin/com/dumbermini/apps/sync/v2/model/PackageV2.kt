@@ -35,6 +35,7 @@ data class MetadataV2(
     val license: String? = null,
     val litecoin: String? = null,
     val openCollective: String? = null,
+    val popularity: Long = 0,
     val preferredSigner: String? = null,
     val promoGraphic: LocalizedIcon? = null,
     val sourceCode: String? = null,

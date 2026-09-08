@@ -35,7 +35,7 @@ class AppListAdapter(
     private val onClick: (packageName: String) -> Unit,
 ) : CursorRecyclerAdapter<AppListAdapter.ViewType, RecyclerView.ViewHolder>() {
 
-    enum class ViewType { PRODUCT, HEADER, LOADING, EMPTY }
+    enum class ViewType { PRODUCT, LOADING, EMPTY }
 
     private inner class ProductViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
         val name = itemView.findViewById<TextView>(R.id.name)!!
@@ -89,47 +89,10 @@ class AppListAdapter(
         }
     }
 
-    private class HeaderViewHolder(context: Context) :
-        RecyclerView.ViewHolder(TextView(context)) {
-        val text: TextView
-            get() = itemView as TextView
-
-        init {
-            with(itemView as TextView) {
-                setPadding(20.dp, 16.dp, 20.dp, 8.dp)
-                setTextColor(context.getColorFromAttr(android.R.attr.colorPrimary))
-                setTextSizeScaled(18)
-                typeface = TypefaceExtra.medium
-                layoutParams = RecyclerView.LayoutParams(
-                    RecyclerView.LayoutParams.MATCH_PARENT,
-                    RecyclerView.LayoutParams.WRAP_CONTENT
-                )
-            }
-        }
-    }
-
     var repositories: Map<Long, Repository> = emptyMap()
         set(value) {
             field = value
             notifyDataSetChanged()
-        }
-
-    var currentSection: ProductItem.Section = ProductItem.Section.All
-        @SuppressLint("NotifyDataSetChanged")
-        set(value) {
-            if (field != value) {
-                field = value
-                notifyDataSetChanged()
-            }
-        }
-
-    var searchQuery: String = ""
-        @SuppressLint("NotifyDataSetChanged")
-        set(value) {
-            if (field != value) {
-                field = value
-                notifyDataSetChanged()
-            }
         }
 
     var emptyText: String = ""
@@ -149,20 +112,15 @@ class AppListAdapter(
     private val isEmpty: Boolean
         get() = super.getItemCount() == 0
 
-    override fun getItemCount(): Int = when {
-        isEmpty -> 1
-        else -> super.getItemCount() + if (getHeaderPosition() != null) 1 else 0
-    }
+    override fun getItemCount(): Int = if (isEmpty) 1 else super.getItemCount()
 
     override fun getItemId(position: Int): Long = when {
         isEmpty -> -1
-        position == getHeaderPosition() -> Long.MIN_VALUE
-        else -> super.getItemId(toCursorPosition(position))
+        else -> super.getItemId(position)
     }
 
     override fun getItemEnumViewType(position: Int): ViewType {
         return when {
-            position == getHeaderPosition() -> ViewType.HEADER
             !isEmpty -> ViewType.PRODUCT
             cursor == null -> ViewType.LOADING
             else -> ViewType.EMPTY
@@ -171,52 +129,14 @@ class AppListAdapter(
 
     private fun getPackageName(position: Int): String {
         return Database.ProductAdapter.transformPackageName(
-            moveTo(toCursorPosition(position).coerceAtLeast(0))
+            moveTo(position.coerceAtLeast(0))
         )
     }
 
     private fun getProductItem(position: Int): ProductItem {
         return Database.ProductAdapter.transformItem(
-            moveTo(toCursorPosition(position).coerceAtLeast(0))
+            moveTo(position.coerceAtLeast(0))
         )
-    }
-
-    private fun getHeaderPosition(): Int? {
-        if (source != AppListFragment.Source.AVAILABLE ||
-            currentSection != ProductItem.Section.All ||
-            searchQuery.isNotEmpty()
-        ) {
-            return null
-        }
-        val cursor = cursor ?: return null
-        if (cursor.count < 2) {
-            return null
-        }
-        val preferredRepoIds = repositories.values
-            .filter { Repository.isPreferredRepoAddress(it.address) }
-            .mapTo(mutableSetOf()) { it.id }
-        if (preferredRepoIds.isEmpty()) {
-            return null
-        }
-        var leadingPreferredApps = 0
-        while (leadingPreferredApps < cursor.count) {
-            val repositoryId = Database.ProductAdapter.transformItem(moveTo(leadingPreferredApps))
-                .repositoryId
-            if (repositoryId !in preferredRepoIds) {
-                break
-            }
-            leadingPreferredApps++
-        }
-        return leadingPreferredApps.takeIf { it in 1 until cursor.count }
-    }
-
-    private fun toCursorPosition(position: Int): Int {
-        val headerPosition = getHeaderPosition()
-        return if (headerPosition != null && position > headerPosition) {
-            position - 1
-        } else {
-            position
-        }
     }
 
     override fun onCreateViewHolder(
@@ -225,7 +145,6 @@ class AppListAdapter(
     ): RecyclerView.ViewHolder {
         return when (viewType) {
             ViewType.PRODUCT -> ProductViewHolder(parent.inflate(R.layout.product_item))
-            ViewType.HEADER -> HeaderViewHolder(parent.context)
             ViewType.LOADING -> LoadingViewHolder(parent.context)
             ViewType.EMPTY -> EmptyViewHolder(parent.context)
         }
@@ -306,11 +225,6 @@ class AppListAdapter(
                 holder.name.isEnabled = enabled
                 holder.status.isEnabled = enabled
                 holder.summary.isEnabled = enabled
-            }
-
-            ViewType.HEADER -> {
-                holder as HeaderViewHolder
-                holder.text.setText(R.string.f_droid_app_repository)
             }
 
             ViewType.LOADING -> {

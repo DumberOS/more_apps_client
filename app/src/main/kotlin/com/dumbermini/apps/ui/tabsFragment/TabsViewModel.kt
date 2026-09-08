@@ -27,7 +27,7 @@ class TabsViewModel @Inject constructor(
 
     val sortOrder = settingsRepository
         .get { sortOrder }
-        .asStateFlow(SortOrder.UPDATED)
+        .asStateFlow(SortOrder.POPULARITY)
 
     val allowHomeScreenSwiping = settingsRepository
         .get { homeScreenSwiping }

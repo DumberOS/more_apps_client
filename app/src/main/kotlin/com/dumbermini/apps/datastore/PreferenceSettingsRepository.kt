@@ -232,7 +232,7 @@ class PreferenceSettingsRepository(
         val dynamicTheme = preferences[DYNAMIC_THEME] ?: false
         val autoUpdate = preferences[AUTO_UPDATE] ?: true
         val autoSync = AutoSync.valueOf(preferences[AUTO_SYNC] ?: AutoSync.WIFI_ONLY.name)
-        val sortOrder = SortOrder.valueOf(preferences[SORT_ORDER] ?: SortOrder.UPDATED.name)
+        val sortOrder = SortOrder.valueOf(preferences[SORT_ORDER] ?: SortOrder.POPULARITY.name)
         val type = ProxyType.valueOf(preferences[PROXY_TYPE] ?: ProxyType.DIRECT.name)
         val host = preferences[PROXY_HOST] ?: "localhost"
         val port = preferences[PROXY_PORT] ?: 9050

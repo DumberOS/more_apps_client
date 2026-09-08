@@ -21,6 +21,7 @@ data class Product(
     val tracker: String,
     val added: Long,
     val updated: Long,
+    val popularity: Long,
     val suggestedVersionCode: Long,
     val categories: List<String>,
     val antiFeatures: List<String>,

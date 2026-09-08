@@ -1,5 +1,6 @@
 package com.dumbermini.apps.data.local.model
 
+import androidx.room.ColumnInfo
 import androidx.room.Embedded
 import androidx.room.Entity
 import androidx.room.ForeignKey
@@ -41,6 +42,8 @@ import com.dumbermini.apps.sync.v2.model.MetadataV2
 data class AppEntity(
     val added: Long,
     val lastUpdated: Long,
+    @ColumnInfo(defaultValue = "0")
+    val popularity: Long,
     val license: String?,
     val preferredSigner: String?,
     val packageName: String,
@@ -122,6 +125,7 @@ fun MetadataV2.appEntity(
 ) = AppEntity(
     added = added,
     lastUpdated = lastUpdated,
+    popularity = popularity,
     license = license,
     preferredSigner = preferredSigner,
     packageName = packageName,

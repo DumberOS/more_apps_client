@@ -53,7 +53,7 @@ class PreferenceSettingsRepositoryTest {
         assertEquals("system", settings.language)
         assertEquals(Theme.SYSTEM, settings.theme)
         assertEquals(AutoSync.WIFI_ONLY, settings.autoSync)
-        assertEquals(SortOrder.UPDATED, settings.sortOrder)
+        assertEquals(SortOrder.POPULARITY, settings.sortOrder)
         assertFalse(settings.dynamicTheme)
     }
 
