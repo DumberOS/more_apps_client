@@ -503,8 +503,9 @@ class TabsFragment : ScreenFragment() {
     }
 
     private fun updateSection(section: ProductItem.Section) {
+        sectionsAdapter?.hasSelectedSection = section !is ProductItem.Section.All
         layout?.sectionName?.text = when (section) {
-            is ProductItem.Section.All -> getString(stringRes.all_applications)
+            is ProductItem.Section.All -> getString(stringRes.categories)
             is ProductItem.Section.Category -> section.name
             is ProductItem.Section.Repository -> section.name
         }
@@ -656,6 +657,14 @@ class TabsFragment : ScreenFragment() {
                 notifyDataSetChanged()
             }
 
+        var hasSelectedSection: Boolean = false
+            set(value) {
+                if (field == value) return
+                field = value
+                val allIndex = sections.indexOf(ProductItem.Section.All)
+                if (allIndex >= 0) notifyItemChanged(allIndex)
+            }
+
         fun configureDivider(
             context: Context,
             position: Int,
@@ -724,7 +733,7 @@ class TabsFragment : ScreenFragment() {
             }
             holder.title.text = when (section) {
                 is ProductItem.Section.All -> holder.itemView.resources.getString(
-                    stringRes.all_applications,
+                    if (hasSelectedSection) stringRes.clear_category else stringRes.categories,
                 )
 
                 is ProductItem.Section.Category -> section.name
