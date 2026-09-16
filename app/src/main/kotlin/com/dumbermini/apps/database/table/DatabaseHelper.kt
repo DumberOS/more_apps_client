@@ -17,7 +17,7 @@ import com.dumbermini.apps.utility.serialization.repository
 
 private const val DB_LEGACY_NAME = "droidify"
 
-private const val DB_LEGACY_VERSION = 9
+private const val DB_LEGACY_VERSION = 10
 
 class DatabaseHelper(context: Context) :
     SQLiteOpenHelper(context, DB_LEGACY_NAME, null, DB_LEGACY_VERSION) {
@@ -52,6 +52,12 @@ class DatabaseHelper(context: Context) :
                     "typeof(${Schema.Product.ROW_DATA_ITEM}) != 'blob' OR " +
                     "typeof(${Schema.Product.ROW_POPULARITY}) != 'integer'",
                 null,
+            )
+        }
+        if (oldVersion < 10) {
+            db.execSQL(
+                "ALTER TABLE ${Schema.Product.name} " +
+                    "ADD COLUMN ${Schema.Product.ROW_COUNTRY} TEXT NOT NULL DEFAULT ''",
             )
         }
         db.removeRepositories()

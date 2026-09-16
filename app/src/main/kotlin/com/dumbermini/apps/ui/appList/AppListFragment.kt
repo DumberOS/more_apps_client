@@ -43,6 +43,7 @@ class AppListFragment() : Fragment(), CursorOwner.Callback {
         val updateAll: Boolean,
     ) {
         AVAILABLE(stringRes.available, true, false),
+        LOCAL(stringRes.local_apps, true, false),
         INSTALLED(stringRes.installed, false, true)
     }
 
@@ -167,6 +168,11 @@ class AppListFragment() : Fragment(), CursorOwner.Callback {
         }
     }
 
+    override fun onResume() {
+        super.onResume()
+        viewModel.refreshCountries()
+    }
+
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
         val managerState = layoutManagerState ?: recyclerView.layoutManager?.onSaveInstanceState()
@@ -194,6 +200,7 @@ class AppListFragment() : Fragment(), CursorOwner.Callback {
 
             else -> when (source) {
                 Source.AVAILABLE -> getString(stringRes.no_applications_available)
+                Source.LOCAL -> getString(stringRes.no_local_applications)
                 Source.INSTALLED -> getString(stringRes.no_applications_installed)
             }
         }

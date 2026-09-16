@@ -15,6 +15,7 @@ import com.dumbermini.apps.model.InstalledItem
 import com.dumbermini.apps.model.Product
 import com.dumbermini.apps.model.ProductItem
 import com.dumbermini.apps.model.Repository
+import com.dumbermini.apps.utility.common.device.CountryCodes
 import com.dumbermini.apps.utility.common.extension.Json
 import com.dumbermini.apps.utility.common.extension.asSequence
 import com.dumbermini.apps.utility.common.extension.firstOrNull
@@ -87,6 +88,7 @@ object Database {
             const val ROW_DESCRIPTION = "description"
             const val ROW_ADDED = "added"
             const val ROW_UPDATED = "updated"
+            const val ROW_COUNTRY = "country"
             const val ROW_POPULARITY = "popularity"
             const val ROW_VERSION_CODE = "version_code"
             const val ROW_SIGNATURES = "signatures"
@@ -105,6 +107,7 @@ object Database {
         $ROW_ADDED INTEGER NOT NULL,
         $ROW_UPDATED INTEGER NOT NULL,
         $ROW_POPULARITY INTEGER NOT NULL,
+        $ROW_COUNTRY TEXT NOT NULL DEFAULT '',
         $ROW_VERSION_CODE INTEGER NOT NULL,
         $ROW_SIGNATURES TEXT NOT NULL,
         $ROW_COMPATIBLE INTEGER NOT NULL,
@@ -542,6 +545,7 @@ object Database {
             section: ProductItem.Section,
             order: SortOrder,
             signal: CancellationSignal?,
+            countries: Set<String>? = null,
         ): Cursor {
             val builder = QueryBuilder()
 
@@ -594,6 +598,15 @@ object Database {
             } else if (section is ProductItem.Section.Repository) {
                 builder += "AND product.${Schema.Product.ROW_REPOSITORY_ID} = ?"
                 builder %= section.id.toString()
+            }
+
+            if (countries != null) {
+                if (countries.isEmpty()) {
+                    builder += "AND 0"
+                } else {
+                    builder += "AND product.${Schema.Product.ROW_COUNTRY} IN (${countries.joinToString { "?" }})"
+                    builder %= countries.toList()
+                }
             }
 
             if (searchQuery.isNotEmpty()) {
@@ -666,6 +679,31 @@ object Database {
                             .getInt(cursor.getColumnIndexOrThrow(Schema.Synthetic.ROW_MATCH_RANK))
                     }
                 }
+        }
+    }
+
+    object CountryAdapter {
+        fun getAllStream(): Flow<Set<String>> = flowOf(Unit)
+            .onCompletion {
+                if (it == null) emitAll(kotlinx.coroutines.flow.merge(
+                    flowCollection(Subject.Products), flowCollection(Subject.Repositories),
+                ))
+            }
+            .map { getAll() }
+            .flowOn(Dispatchers.IO)
+
+        fun getAll(): Set<String> {
+            val builder = QueryBuilder()
+            builder += """SELECT DISTINCT product.${Schema.Product.ROW_COUNTRY}
+                FROM ${Schema.Product.name} AS product
+                JOIN ${Schema.Repository.name} AS repository
+                ON product.${Schema.Product.ROW_REPOSITORY_ID} = repository.${Schema.Repository.ROW_ID}
+                WHERE repository.${Schema.Repository.ROW_ENABLED} != 0
+                AND repository.${Schema.Repository.ROW_DELETED} == 0
+                AND product.${Schema.Product.ROW_COUNTRY} != ''"""
+            return builder.query(db, null).use { cursor ->
+                cursor.asSequence().map { it.getString(0) }.toSet()
+            }
         }
     }
 
@@ -824,6 +862,7 @@ object Database {
                             put(Schema.Product.ROW_DESCRIPTION, product.description)
                             put(Schema.Product.ROW_ADDED, product.added)
                             put(Schema.Product.ROW_UPDATED, product.updated)
+                            put(Schema.Product.ROW_COUNTRY, CountryCodes.normalize(product.country).orEmpty())
                             put(Schema.Product.ROW_POPULARITY, product.popularity)
                             put(Schema.Product.ROW_VERSION_CODE, product.versionCode)
                             put(Schema.Product.ROW_SIGNATURES, signatures)
@@ -871,6 +910,7 @@ object Database {
                         Schema.Product.ROW_DESCRIPTION,
                         Schema.Product.ROW_ADDED,
                         Schema.Product.ROW_UPDATED,
+                        Schema.Product.ROW_COUNTRY,
                         Schema.Product.ROW_POPULARITY,
                         Schema.Product.ROW_VERSION_CODE,
                         Schema.Product.ROW_SIGNATURES,

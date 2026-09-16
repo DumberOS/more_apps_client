@@ -13,6 +13,7 @@ import com.dumbermini.apps.model.ProductItem.Section.All
 import com.dumbermini.apps.service.Connection
 import com.dumbermini.apps.service.SyncService
 import com.dumbermini.apps.utility.common.extension.asStateFlow
+import com.dumbermini.apps.data.LocalCountrySelection
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -27,6 +28,7 @@ import kotlinx.coroutines.launch
 class AppListViewModel
 @Inject constructor(
     settingsRepository: SettingsRepository,
+    private val countrySelection: LocalCountrySelection,
 ) : ViewModel() {
 
     private val skipSignatureStream = settingsRepository
@@ -39,13 +41,21 @@ class AppListViewModel
 
     private val sections = MutableStateFlow<ProductItem.Section>(All)
 
+    private val countries = countrySelection.countries
+
+    fun refreshCountries() {
+        countrySelection.refresh()
+    }
+
     val state = combine(
         skipSignatureStream,
         sortOrderFlow,
         sections,
-    ) { skipSignature, sortOrder, section ->
+        countries,
+    ) { skipSignature, sortOrder, section, countryCodes ->
         AppListState(
             sections = section,
+            countries = countryCodes,
             sortOrder = sortOrder,
             skipSignatureCheck = skipSignature,
         )
@@ -80,13 +90,15 @@ class AppListViewModel
 
 data class AppListState(
     val sections: ProductItem.Section = All,
+    val countries: Set<String> = emptySet(),
     val sortOrder: SortOrder = SortOrder.POPULARITY,
     val skipSignatureCheck: Boolean = false,
 ) {
     fun toRequest(source: AppListFragment.Source, searchQuery: String) = when (source) {
-        AppListFragment.Source.AVAILABLE -> Available(
+        AppListFragment.Source.AVAILABLE, AppListFragment.Source.LOCAL -> Available(
+            countries = countries.takeIf { source == AppListFragment.Source.LOCAL },
             searchQuery = searchQuery,
-            section = sections,
+            section = if (source == AppListFragment.Source.LOCAL) All else sections,
             order = sortOrder,
             skipSignatureCheck = skipSignatureCheck,
         )

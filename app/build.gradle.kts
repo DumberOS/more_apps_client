@@ -18,7 +18,7 @@ android {
 
     defaultConfig {
         applicationId = "com.dumbermini.apps"
-        minSdk = 23
+        minSdk = 34
         versionName = latestVersionName
         versionCode = 710
 

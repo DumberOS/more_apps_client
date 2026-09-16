@@ -242,6 +242,7 @@ object IndexV1Parser {
     private const val KEY_PRODUCT_ISSUETRACKER = "issueTracker"
     private const val KEY_PRODUCT_ADDED = "added"
     private const val KEY_PRODUCT_LASTUPDATED = "lastUpdated"
+    private const val KEY_PRODUCT_COUNTRY = "country"
     private const val KEY_PRODUCT_POPULARITY = "popularity"
     private const val KEY_PRODUCT_SUGGESTEDVERSIONCODE = "suggestedVersionCode"
     private const val KEY_PRODUCT_CATEGORIES = "categories"
@@ -276,7 +277,8 @@ object IndexV1Parser {
         var tracker = ""
         var added = 0L
         var updated = 0L
-        var popularity = 0L
+        var country = ""
+    var popularity = 0L
         var suggestedVersionCode = 0L
         var categories = emptyList<String>()
         var antiFeatures = emptyList<String>()
@@ -299,6 +301,7 @@ object IndexV1Parser {
                 key.string(KEY_PRODUCT_ISSUETRACKER) -> tracker = valueAsString
                 key.number(KEY_PRODUCT_ADDED) -> added = valueAsLong
                 key.number(KEY_PRODUCT_LASTUPDATED) -> updated = valueAsLong
+                key.string(KEY_PRODUCT_COUNTRY) -> country = valueAsString
                 key.number(KEY_PRODUCT_POPULARITY) -> popularity = valueAsLong
                 key.string(KEY_PRODUCT_SUGGESTEDVERSIONCODE) ->
                     suggestedVersionCode =
@@ -421,6 +424,7 @@ object IndexV1Parser {
             added = added,
             updated = updated,
             popularity = popularity,
+        country = country,
             suggestedVersionCode = suggestedVersionCode,
             categories = categories,
             antiFeatures = antiFeatures,

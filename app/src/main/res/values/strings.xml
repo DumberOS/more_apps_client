@@ -18,6 +18,11 @@
     <string name="auto_update">Auto-update apps</string>
     <string name="auto_update_apps">Install updates automatically</string>
     <string name="available">Explore</string>
+    <string name="local_countries_count">Countries (%1$d)</string>
+    <string name="no_country_apps">No apps with a country are available in enabled repositories.</string>
+    <string name="automatic_countries">Use SIM / locale countries</string>
+    <string name="local_apps">Local apps</string>
+    <string name="no_local_applications">No apps match the selected countries. Choose countries above or refresh the repositories.</string>
     <string name="bug_tracker">Bug tracker</string>
     <string name="cancel">Cancel</string>
     <string name="cannot_open_link">Can\'t open link</string>

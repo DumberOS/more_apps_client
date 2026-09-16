@@ -16,9 +16,10 @@ class CursorOwner : Fragment(), LoaderManager.LoaderCallbacks<Cursor> {
         data class Available(
             val searchQuery: String,
             val section: ProductItem.Section,
+            val countries: Set<String>? = null,
             val order: SortOrder,
             val skipSignatureCheck: Boolean = false,
-        ) : Request(1)
+        ) : Request(if (countries == null) 1 else 5)
 
         data class Installed(
             val searchQuery: String,
@@ -86,6 +87,7 @@ class CursorOwner : Fragment(), LoaderManager.LoaderCallbacks<Cursor> {
                             updates = false,
                             searchQuery = request.searchQuery,
                             section = request.section,
+                            countries = request.countries,
                             order = request.order,
                             signal = it,
                             skipSignatureCheck = request.skipSignatureCheck,

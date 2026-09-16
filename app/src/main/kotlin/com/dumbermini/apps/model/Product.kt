@@ -29,6 +29,7 @@ data class Product(
     val donates: List<Donate>,
     val screenshots: List<Screenshot>,
     val releases: List<Release>,
+    val country: String = "",
 ) {
     data class Author(val name: String, val email: String, val web: String)
 

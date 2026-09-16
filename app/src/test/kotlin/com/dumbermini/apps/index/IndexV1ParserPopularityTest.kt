@@ -25,7 +25,7 @@ class IndexV1ParserPopularityTest {
             {
               "repo": {"name": "Test"},
               "apps": [
-                {"packageName": "com.example.popular", "name": "Popular", "popularity": 5000000},
+                {"packageName": "com.example.popular", "name": "Popular", "popularity": 5000000, "country": "Sweden"},
                 {"packageName": "com.example.unknown", "name": "Unknown"}
               ]
             }
@@ -53,6 +53,8 @@ class IndexV1ParserPopularityTest {
 
         assertEquals(5_000_000L, products[0].popularity)
         assertEquals(0L, products[1].popularity)
+        assertEquals("Sweden", products[0].country)
+        assertEquals("", products[1].country)
 
         val output = ByteArrayOutputStream()
         Json.factory.createGenerator(output).use { generator ->
@@ -63,5 +65,6 @@ class IndexV1ParserPopularityTest {
             parser.product()
         }
         assertEquals(5_000_000L, restored.popularity)
+        assertEquals("Sweden", restored.country)
     }
 }

@@ -63,6 +63,7 @@ class LegacyProductMigrationTest {
             added = 0L,
             updated = 0L,
             popularity = 10_000_000_000L,
+            country = "Sweden",
             suggestedVersionCode = 0L,
             categories = emptyList(),
             antiFeatures = emptyList(),
@@ -73,12 +74,39 @@ class LegacyProductMigrationTest {
         )
 
         Database.UpdaterAdapter.createTemporaryTable()
-        Database.UpdaterAdapter.putTemporary(listOf(product))
+        Database.UpdaterAdapter.putTemporary(listOf(
+            product,
+            product.copy(packageName = "com.example.global", country = ""),
+            product.copy(packageName = "com.example.polish", country = "Poland"),
+            product.copy(packageName = "com.example.invalid", country = "Unknown"),
+        ))
         Database.UpdaterAdapter.finishTemporary(repository, success = true)
 
         val restored = Database.ProductAdapter.get(product.packageName, signal = null).single()
         assertEquals(product.popularity, restored.popularity)
         assertEquals(product.packageName, restored.packageName)
+        assertEquals("Sweden", restored.country)
+
+        fun query(countries: Set<String>?, search: String = ""): Int = Database.ProductAdapter.query(
+            installed = false,
+            updates = false,
+            searchQuery = search,
+            section = com.dumbermini.apps.model.ProductItem.Section.All,
+            order = com.dumbermini.apps.datastore.model.SortOrder.POPULARITY,
+            signal = null,
+            countries = countries,
+        ).use { it.count }
+
+        assertEquals(setOf("SE", "PL"), Database.CountryAdapter.getAll())
+        assertEquals(4, query(null)) // Explore continues to include every app.
+        assertEquals(1, query(setOf("SE")))
+        assertEquals(2, query(setOf("SE", "PL")))
+        assertEquals(0, query(setOf("FR")))
+        assertEquals(0, query(emptySet()))
+        assertEquals(1, query(setOf("SE", "PL"), "com.example.polish"))
+        assertEquals(0, query(setOf("SE"), "com.example.polish"))
+        Database.RepositoryAdapter.put(repository.enable(false))
+        assertEquals(emptySet(), Database.CountryAdapter.getAll())
     }
 
     private fun legacyProductTableSql(): String = with(Database.Schema.Product) {

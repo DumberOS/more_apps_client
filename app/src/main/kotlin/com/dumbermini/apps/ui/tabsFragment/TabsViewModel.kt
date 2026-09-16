@@ -21,7 +21,10 @@ import javax.inject.Inject
 class TabsViewModel @Inject constructor(
     private val settingsRepository: SettingsRepository,
     private val savedStateHandle: SavedStateHandle,
+    val countrySelection: com.dumbermini.apps.data.LocalCountrySelection,
 ) : ViewModel() {
+    val availableCountries = Database.CountryAdapter.getAllStream().asStateFlow(emptySet())
+
     val currentSection =
         savedStateHandle.getStateFlow<ProductItem.Section>(STATE_SECTION, ProductItem.Section.All)
 

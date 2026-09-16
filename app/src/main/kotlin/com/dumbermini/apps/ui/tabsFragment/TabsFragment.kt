@@ -97,6 +97,11 @@ class TabsFragment : ScreenFragment() {
     private var viewPager: ViewPager2? = null
     private var onBackPressedCallback: OnBackPressedCallback? = null
 
+    private var countryPopup: android.widget.PopupWindow? = null
+
+    private val isLocalPage: Boolean
+        get() = viewPager?.currentItem == AppListFragment.Source.LOCAL.ordinal
+
     private var showSections = false
         set(value) {
             if (field != value) {
@@ -282,7 +287,7 @@ class TabsFragment : ScreenFragment() {
                     source = AppListFragment.Source.entries[position],
                 ).also {
                     it.setSearchQuery(searchQuery)
-                    if (it.source.sections) {
+                    if (it.source == AppListFragment.Source.AVAILABLE) {
                         it.setSection(viewModel.currentSection.value)
                     }
                 }
@@ -308,6 +313,15 @@ class TabsFragment : ScreenFragment() {
                 }
                 launch {
                     viewModel.currentSection.collect(::updateSection)
+                }
+                launch {
+                    viewModel.countrySelection.countries.collect { updateFilterLabel() }
+                }
+                launch {
+                    viewModel.availableCountries.collect {
+                        countryPopup?.dismiss()
+                        updateFilterLabel()
+                    }
                 }
                 launch {
                     viewModel.allowHomeScreenSwiping.collect {
@@ -408,6 +422,8 @@ class TabsFragment : ScreenFragment() {
     }
 
     override fun onDestroyView() {
+        countryPopup?.dismiss()
+        countryPopup = null
         super.onDestroyView()
 
         favouritesItem = null
@@ -496,20 +512,90 @@ class TabsFragment : ScreenFragment() {
         sectionsList: List<ProductItem.Section>,
     ) {
         sectionsAdapter?.sections = sectionsList
+        updateFilterLabel()
         layout?.run {
-            sectionIcon.isVisible = sectionsList.any { it !is ProductItem.Section.All }
-            sectionLayout.setOnClickListener { showSections = isVisible && !showSections }
+            sectionLayout.setOnClickListener {
+                if (isLocalPage) showCountryPicker() else showSections = isVisible && !showSections
+            }
         }
     }
 
     private fun updateSection(section: ProductItem.Section) {
         sectionsAdapter?.hasSelectedSection = section !is ProductItem.Section.All
-        layout?.sectionName?.text = when (section) {
+        updateFilterLabel()
+        productFragments.filter { it.source == AppListFragment.Source.AVAILABLE }
+            .forEach { it.setSection(section) }
+    }
+
+    private fun updateFilterLabel() {
+        layout?.sectionIcon?.isVisible = isLocalPage ||
+            viewModel.sections.value.any { it !is ProductItem.Section.All }
+        layout?.sectionName?.text = if (isLocalPage) {
+            val count = viewModel.countrySelection.countries.value
+                .intersect(viewModel.availableCountries.value).size
+            getString(stringRes.local_countries_count, count)
+        } else when (val section = viewModel.currentSection.value) {
             is ProductItem.Section.All -> getString(stringRes.categories)
             is ProductItem.Section.Category -> section.name
             is ProductItem.Section.Repository -> section.name
         }
-        productFragments.filter { it.source.sections }.forEach { it.setSection(section) }
+    }
+
+    private fun showCountryPicker() {
+        countryPopup?.dismiss()
+        val context = requireContext()
+        fun pixels(dp: Int) = (dp * resources.displayMetrics.density).roundToInt()
+        val availableHeight = android.widget.PopupWindow(context)
+            .getMaxAvailableHeight(layout!!.sectionLayout)
+        val countries = viewModel.availableCountries.value.sortedBy {
+            java.util.Locale.Builder().setRegion(it).build().displayCountry
+        }
+        val content = android.widget.LinearLayout(context).apply {
+            orientation = android.widget.LinearLayout.VERTICAL
+        }
+        val list = android.widget.ListView(context).apply {
+            choiceMode = android.widget.ListView.CHOICE_MODE_MULTIPLE
+            adapter = android.widget.ArrayAdapter(context, android.R.layout.simple_list_item_multiple_choice,
+                countries.map { java.util.Locale.Builder().setRegion(it).build().displayCountry })
+            countries.forEachIndexed { index, code ->
+                setItemChecked(index, code in viewModel.countrySelection.countries.value)
+            }
+            setOnItemClickListener { _, _, position, _ ->
+                val selected = viewModel.countrySelection.countries.value.toMutableSet()
+                if (isItemChecked(position)) selected.add(countries[position]) else selected.remove(countries[position])
+                viewModel.countrySelection.select(selected)
+            }
+        }
+        if (countries.isEmpty()) {
+            content.addView(TextView(context).apply {
+                setText(stringRes.no_country_apps)
+                setPadding(pixels(16), pixels(16), pixels(16), pixels(16))
+            })
+        } else {
+            content.addView(list, android.widget.LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                minOf(countries.size * pixels(48), pixels(288),
+                    (availableHeight - pixels(72)).coerceAtLeast(pixels(48))),
+            ))
+        }
+        content.addView(com.google.android.material.button.MaterialButton(context).apply {
+            setText(stringRes.automatic_countries)
+            setOnClickListener {
+                viewModel.countrySelection.useAutomatic()
+                countryPopup?.dismiss()
+            }
+        })
+        countryPopup = android.widget.PopupWindow(content,
+            layout!!.sectionLayout.width, ViewGroup.LayoutParams.WRAP_CONTENT, true).apply {
+            setBackgroundDrawable(MaterialShapeDrawable().apply {
+                fillColor = ColorStateList.valueOf(SurfaceColors.SURFACE_2.getColor(context))
+            })
+            elevation = pixels(8).toFloat()
+            isOutsideTouchable = true
+            setOnDismissListener { layout?.sectionIcon?.scaleY = 1f }
+            showAsDropDown(layout!!.sectionLayout)
+        }
+        layout?.sectionIcon?.scaleY = -1f
     }
 
     private fun animateSectionsList() {
@@ -598,6 +684,9 @@ class TabsFragment : ScreenFragment() {
 
         override fun onPageSelected(position: Int) {
             val source = AppListFragment.Source.entries[position]
+            countryPopup?.dismiss()
+            if (isLocalPage) showSections = false
+            updateFilterLabel()
             updateUpdateNotificationBlocker(source)
             sortOrderMenu!!.first.apply {
                 setShowAsActionFlags(
