@@ -38,9 +38,9 @@ class TabsViewModel @Inject constructor(
             Database.CategoryAdapter.getAllStream(),
             Database.RepositoryAdapter.getEnabledStream(),
         ) { categories, repos ->
-            val productCategories = categories
+            val productCategories = allowedCategories
                 .asSequence()
-                .sorted()
+                .filter(categories::contains)
                 .map(ProductItem.Section::Category)
                 .toList()
 
@@ -108,6 +108,41 @@ class TabsViewModel @Inject constructor(
     }
 
     companion object {
+        private val allowedCategories = listOf(
+            "2FA",
+            "Ad blocker",
+            "AI assistant",
+            "App store",
+            "Banking",
+            "Banking & tap to pay",
+            "Bikeshare",
+            "Browser",
+            "Calendar",
+            "Car remote",
+            "E-ID",
+            "Email",
+            "Dating",
+            "File management",
+            "Game",
+            "Health",
+            "Launcher",
+            "Messaging",
+            "Music & Podcasts",
+            "Navigation",
+            "Post & parcels",
+            "Parking",
+            "Password manager",
+            "Rideshare",
+            "Smart home",
+            "Social network",
+            "Terminal emulator",
+            "Tickets & Wallets",
+            "Transit & Transport",
+            "VPN",
+            "Weather",
+            "Other",
+        )
+
         private const val STATE_SECTION = "section"
     }
 }
