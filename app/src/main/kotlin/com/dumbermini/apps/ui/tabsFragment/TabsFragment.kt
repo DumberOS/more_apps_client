@@ -129,7 +129,7 @@ class TabsFragment : ScreenFragment() {
 
     private var sectionsAnimator: ValueAnimator? = null
 
-    private var needSelectUpdates = false
+    private var needSelectInstalled = false
 
     private val productFragments: Sequence<AppListFragment>
         get() = if (host == null) {
@@ -439,9 +439,9 @@ class TabsFragment : ScreenFragment() {
         super.onViewStateRestored(savedInstanceState)
 
         (searchMenuItem?.actionView as FocusSearchView).allowFocus = true
-        if (needSelectUpdates) {
-            // don't clear the flag here - let selectUpdatesInternal / pageChangeCallback manage it
-            selectUpdatesInternal(false)
+        if (needSelectInstalled) {
+            // don't clear the flag here - let selectInstalledInternal / pageChangeCallback manage it
+            selectInstalledInternal(false)
         }
     }
 
@@ -465,10 +465,10 @@ class TabsFragment : ScreenFragment() {
         }
     }
 
-    internal fun selectUpdates() = selectUpdatesInternal(true)
+    internal fun selectInstalled() = selectInstalledInternal(true)
 
     private fun updateUpdateNotificationBlocker(activeSource: AppListFragment.Source) {
-        val blockerFragment = if (activeSource == AppListFragment.Source.UPDATES) {
+        val blockerFragment = if (activeSource == AppListFragment.Source.INSTALLED) {
             productFragments.find { it.source == activeSource }
         } else {
             null
@@ -476,15 +476,15 @@ class TabsFragment : ScreenFragment() {
         syncConnection.binder?.setUpdateNotificationBlocker(blockerFragment)
     }
 
-    private fun selectUpdatesInternal(allowSmooth: Boolean) {
+    private fun selectInstalledInternal(allowSmooth: Boolean) {
         if (view != null) {
             val viewPager = viewPager
             viewPager?.setCurrentItem(
-                AppListFragment.Source.UPDATES.ordinal,
+                AppListFragment.Source.INSTALLED.ordinal,
                 allowSmooth && viewPager.isLaidOut,
             )
         } else {
-            needSelectUpdates = true
+            needSelectInstalled = true
         }
     }
 

@@ -246,7 +246,7 @@ class MainActivity : AppCompatActivity() {
             ACTION_UPDATES -> {
                 navigateToTabsFragment()
                 val tabsFragment = currentFragment as TabsFragment
-                tabsFragment.selectUpdates()
+                tabsFragment.selectInstalled()
                 backHandler()
             }
 

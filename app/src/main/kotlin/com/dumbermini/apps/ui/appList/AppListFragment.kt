@@ -43,8 +43,7 @@ class AppListFragment() : Fragment(), CursorOwner.Callback {
         val updateAll: Boolean,
     ) {
         AVAILABLE(stringRes.available, true, false),
-        INSTALLED(stringRes.installed, false, false),
-        UPDATES(stringRes.updates, false, true)
+        INSTALLED(stringRes.installed, false, true)
     }
 
     constructor(source: Source) : this() {
@@ -53,7 +52,13 @@ class AppListFragment() : Fragment(), CursorOwner.Callback {
         }
     }
 
-    val source by lazy { Source.valueOf(requireArguments().getString(EXTRA_SOURCE)!!) }
+    val source by lazy {
+        // Restore the former Updates page as Installed after an app upgrade.
+        when (val name = requireArguments().getString(EXTRA_SOURCE)!!) {
+            "UPDATES" -> Source.INSTALLED
+            else -> Source.valueOf(name)
+        }
+    }
 
     private val viewModel: AppListViewModel by viewModels()
 
@@ -190,7 +195,6 @@ class AppListFragment() : Fragment(), CursorOwner.Callback {
             else -> when (source) {
                 Source.AVAILABLE -> getString(stringRes.no_applications_available)
                 Source.INSTALLED -> getString(stringRes.no_applications_installed)
-                Source.UPDATES -> getString(stringRes.all_applications_up_to_date)
             }
         }
         layoutManagerState?.let {

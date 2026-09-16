@@ -4,7 +4,6 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.dumbermini.apps.database.CursorOwner.Request.Available
 import com.dumbermini.apps.database.CursorOwner.Request.Installed
-import com.dumbermini.apps.database.CursorOwner.Request.Updates
 import com.dumbermini.apps.database.Database
 import com.dumbermini.apps.datastore.SettingsRepository
 import com.dumbermini.apps.datastore.get
@@ -93,12 +92,6 @@ data class AppListState(
         )
 
         AppListFragment.Source.INSTALLED -> Installed(
-            searchQuery = searchQuery,
-            order = sortOrder,
-            skipSignatureCheck = skipSignatureCheck,
-        )
-
-        AppListFragment.Source.UPDATES -> Updates(
             searchQuery = searchQuery,
             order = sortOrder,
             skipSignatureCheck = skipSignatureCheck,

@@ -607,6 +607,10 @@ object Database {
             }
             builder += "ORDER BY"
 
+            if (installed && !updates) {
+                builder += "${Schema.Synthetic.ROW_CAN_UPDATE} DESC,"
+            }
+
             if (searchQuery.isNotEmpty()) {
                 builder += """${Schema.Synthetic.ROW_MATCH_RANK} DESC,"""
             }

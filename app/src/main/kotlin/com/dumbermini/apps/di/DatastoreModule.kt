@@ -13,6 +13,7 @@ import com.dumbermini.apps.datastore.Settings
 import com.dumbermini.apps.datastore.SettingsRepository
 import com.dumbermini.apps.datastore.SettingsSerializer
 import com.dumbermini.apps.datastore.exporter.SettingsExporter
+import com.dumbermini.apps.datastore.migration.PopularitySortOrderMigration
 import com.dumbermini.apps.datastore.migration.ProtoToPreferenceMigration
 import com.dumbermini.apps.utility.common.Exporter
 import dagger.Module
@@ -50,7 +51,8 @@ object DatastoreModule {
         oldDatastore: DataStore<Settings>,
     ): DataStore<Preferences> = PreferenceDataStoreFactory.create(
         migrations = listOf(
-            ProtoToPreferenceMigration(oldDatastore)
+            ProtoToPreferenceMigration(oldDatastore),
+            PopularitySortOrderMigration(),
         )
     ) {
         context.preferencesDataStoreFile(SETTINGS)

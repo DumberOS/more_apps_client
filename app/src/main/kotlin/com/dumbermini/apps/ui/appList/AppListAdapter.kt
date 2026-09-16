@@ -173,7 +173,9 @@ class AppListAdapter(
                     }
                 }
                 with(holder.status) {
-                    val versionText = if (source == AppListFragment.Source.UPDATES) {
+                    val versionText = if (
+                        source == AppListFragment.Source.INSTALLED && productItem.canUpdate
+                    ) {
                         productItem.version
                     } else {
                         productItem.installedVersion.nullIfEmpty() ?: productItem.version
