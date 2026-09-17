@@ -59,7 +59,7 @@ data class Repository(
     @Suppress("SpellCheckingInspection")
     companion object {
         val PREFERRED_REPO_ADDRESSES = arrayOf(
-            "https://apps.dumbermini.com/repo/",
+            "https://apps.dumbermini.com/v2/repo/",
             "https://apps.dumbermini.com/romobil/repo/",
         )
         const val MICROG_REPO_ADDRESS = "https://microg.org/fdroid/repo"

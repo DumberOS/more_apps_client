@@ -7,6 +7,7 @@ import androidx.core.database.sqlite.transaction
 import com.dumbermini.apps.database.Database.RepositoryAdapter
 import com.dumbermini.apps.database.Database.Schema
 import com.dumbermini.apps.database.Database.jsonParse
+import com.dumbermini.apps.database.Database.jsonGenerate
 import com.dumbermini.apps.database.Database.query
 import com.dumbermini.apps.index.OemRepositoryParser
 import com.dumbermini.apps.model.Repository
@@ -14,6 +15,7 @@ import com.dumbermini.apps.utility.common.device.DumbdroidBuild
 import com.dumbermini.apps.utility.common.extension.asSequence
 import com.dumbermini.apps.utility.common.extension.firstOrNull
 import com.dumbermini.apps.utility.serialization.repository
+import com.dumbermini.apps.utility.serialization.serialize
 
 private const val DB_LEGACY_NAME = "droidify"
 
@@ -63,6 +65,9 @@ class DatabaseHelper(context: Context) :
         db.removeRepositories()
         db.addNewlyAddedRepositories()
         db.addOemRepositories()
+        if (oldVersion < 10) {
+            db.migrateDumberRepositoryAddress()
+        }
         this.updated = true
     }
 
@@ -84,6 +89,38 @@ class DatabaseHelper(context: Context) :
             Schema.Lock,
         )
         dropOldTables(db, Schema.Repository, Schema.Product, Schema.Category)
+    }
+
+    private fun SQLiteDatabase.migrateDumberRepositoryAddress() {
+        val repositories = query(
+            Schema.Repository.name,
+            columns = arrayOf(Schema.Repository.ROW_ID, Schema.Repository.ROW_DATA),
+            selection = null,
+        ).use { cursor ->
+            cursor.asSequence().map {
+                it.getLong(0) to it.getBlob(1).jsonParse { json -> json.repository() }
+            }.toList()
+        }
+        for ((id, repository) in repositories) {
+            if (Repository.normalizeAddress(repository.address) != "https://apps.dumbermini.com/repo") continue
+            val migrated = repository.copy(
+                address = "https://apps.dumbermini.com/v2/repo/",
+                mirrors = emptyList(),
+                lastModified = "",
+                entityTag = "",
+                updated = 0L,
+                timestamp = 0L,
+            )
+            // Update only metadata: preserve the ID, enabled state, and deletion tombstone.
+            update(
+                Schema.Repository.name,
+                android.content.ContentValues().apply {
+                    put(Schema.Repository.ROW_DATA, jsonGenerate(migrated::serialize))
+                },
+                "${Schema.Repository.ROW_ID} = ?",
+                arrayOf(id.toString()),
+            )
+        }
     }
 
     private fun SQLiteDatabase.addOemRepositories() {
