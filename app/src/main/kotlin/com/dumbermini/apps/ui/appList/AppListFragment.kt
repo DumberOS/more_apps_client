@@ -194,6 +194,8 @@ class AppListFragment() : Fragment(), CursorOwner.Callback {
         appListAdapter.cursor = cursor
         appListAdapter.emptyText = when {
             cursor == null -> ""
+            source == Source.LOCAL &&
+                (request as? CursorOwner.Request.Available)?.countries.isNullOrEmpty() -> ""
             searchQuery.isNotEmpty() -> {
                 getString(stringRes.no_matching_applications_found)
             }

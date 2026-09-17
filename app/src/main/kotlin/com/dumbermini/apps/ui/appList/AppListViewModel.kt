@@ -52,10 +52,11 @@ class AppListViewModel
         sortOrderFlow,
         sections,
         countries,
-    ) { skipSignature, sortOrder, section, countryCodes ->
+        Database.CountryAdapter.getAllStream(),
+    ) { skipSignature, sortOrder, section, countryCodes, availableCountries ->
         AppListState(
             sections = section,
-            countries = countryCodes,
+            countries = countryCodes.intersect(availableCountries),
             sortOrder = sortOrder,
             skipSignatureCheck = skipSignature,
         )

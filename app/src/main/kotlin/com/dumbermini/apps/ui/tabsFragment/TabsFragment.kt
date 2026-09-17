@@ -98,6 +98,7 @@ class TabsFragment : ScreenFragment() {
     private var onBackPressedCallback: OnBackPressedCallback? = null
 
     private var countryPopup: android.widget.PopupWindow? = null
+    private var promptedForCountries = false
 
     private val isLocalPage: Boolean
         get() = viewPager?.currentItem == AppListFragment.Source.LOCAL.ordinal
@@ -413,6 +414,7 @@ class TabsFragment : ScreenFragment() {
 
     override fun onResume() {
         super.onResume()
+        updateFilterLabel()
 
         val psq = pendingSearchQuery
         if (psq != null) {
@@ -538,6 +540,26 @@ class TabsFragment : ScreenFragment() {
             is ProductItem.Section.All -> getString(stringRes.categories)
             is ProductItem.Section.Category -> section.name
             is ProductItem.Section.Repository -> section.name
+        }
+        val hasSelectedCountries = viewModel.countrySelection.countries.value
+            .any { it in viewModel.availableCountries.value }
+        if (hasSelectedCountries) promptedForCountries = false
+        if (isLocalPage && !hasSelectedCountries && !promptedForCountries &&
+            viewModel.availableCountries.value.isNotEmpty()
+        ) {
+            layout?.sectionLayout?.post {
+                if (isResumed && isLocalPage && !promptedForCountries &&
+                    viewPager?.scrollState == ViewPager2.SCROLL_STATE_IDLE &&
+                    countryPopup?.isShowing != true &&
+                    viewModel.availableCountries.value.isNotEmpty() &&
+                    viewModel.countrySelection.countries.value.none {
+                        it in viewModel.availableCountries.value
+                    }
+                ) {
+                    promptedForCountries = true
+                    showCountryPicker()
+                }
+            }
         }
     }
 
@@ -685,6 +707,7 @@ class TabsFragment : ScreenFragment() {
         override fun onPageSelected(position: Int) {
             val source = AppListFragment.Source.entries[position]
             countryPopup?.dismiss()
+            promptedForCountries = false
             if (isLocalPage) showSections = false
             updateFilterLabel()
             updateUpdateNotificationBlocker(source)
@@ -705,6 +728,7 @@ class TabsFragment : ScreenFragment() {
             layout!!.sectionChange.isEnabled =
                 state != ViewPager2.SCROLL_STATE_DRAGGING && source.sections
             if (state == ViewPager2.SCROLL_STATE_IDLE) {
+                updateFilterLabel()
                 // onPageSelected can be called earlier than fragments created
                 updateUpdateNotificationBlocker(source)
             }
