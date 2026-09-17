@@ -593,8 +593,13 @@ object Database {
         repository.${Schema.Repository.ROW_DELETED} == 0"""
 
             if (section is ProductItem.Section.Category) {
-                builder += "AND category.${Schema.Category.ROW_NAME} = ?"
-                builder %= section.name
+                if (section.name == "Banking") {
+                    builder += "AND category.${Schema.Category.ROW_NAME} IN (?, ?)"
+                    builder %= listOf("Banking", "Banking & tap to pay")
+                } else {
+                    builder += "AND category.${Schema.Category.ROW_NAME} = ?"
+                    builder %= section.name
+                }
             } else if (section is ProductItem.Section.Repository) {
                 builder += "AND product.${Schema.Product.ROW_REPOSITORY_ID} = ?"
                 builder %= section.id.toString()
