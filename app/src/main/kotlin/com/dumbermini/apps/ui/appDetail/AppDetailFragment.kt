@@ -243,7 +243,7 @@ class AppDetailFragment() : ScreenFragment(), AppDetailAdapter.Callbacks {
         val installed = installed
         val product = products.findSuggested(installed?.installedItem)?.first
         val compatible = product != null && product.selectedReleases.firstOrNull()
-            .let { it != null && it.incompatibilities.isEmpty() }
+            .let { it != null && it.compatible }
         val canInstall = product != null && installed == null && compatible
         val canUpdate =
             product != null && compatible && product.canUpdate(installed?.installedItem) &&
@@ -534,7 +534,7 @@ class AppDetailFragment() : ScreenFragment(), AppDetailAdapter.Callbacks {
     override fun onReleaseClick(release: Release) {
         val installedItem = installed?.installedItem
         when {
-            release.incompatibilities.isNotEmpty() -> {
+            !release.compatible -> {
                 MessageDialog(
                     Message.ReleaseIncompatible(
                         release.incompatibilities,

@@ -27,12 +27,18 @@ class SessionInstallerReceiver : BroadcastReceiver() {
 
     override fun onReceive(context: Context, intent: Intent) {
         val status = intent.getIntExtra(PackageInstaller.EXTRA_STATUS, -1)
+        val sessionId = intent.getIntExtra(PackageInstaller.EXTRA_SESSION_ID, -1)
 
         if (status == PackageInstaller.STATUS_PENDING_USER_ACTION) {
-            // prompts user to enable unknown source
+            // Android may require confirmation for unknown sources or update ownership.
             val promptIntent: Intent? = intent.getParcelableExtra(Intent.EXTRA_INTENT)
 
             promptIntent?.let {
+                if (sessionId >= 0) {
+                    InstallConfirmation.save(context, sessionId, it)
+                    return
+                }
+                // Uninstallation has no install session; retain its existing prompt handling.
                 it.putExtra(Intent.EXTRA_NOT_UNKNOWN_SOURCE, true)
                 it.putExtra(Intent.EXTRA_INSTALLER_PACKAGE_NAME, "com.android.vending")
                 it.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
@@ -40,6 +46,7 @@ class SessionInstallerReceiver : BroadcastReceiver() {
                 context.startActivity(it)
             }
         } else {
+            InstallConfirmation.remove(context, sessionId)
             notifyStatus(intent, context)
         }
     }

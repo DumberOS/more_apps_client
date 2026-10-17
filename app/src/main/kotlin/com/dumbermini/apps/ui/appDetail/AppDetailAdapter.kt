@@ -1067,7 +1067,7 @@ class AppDetailAdapter(private val callbacks: Callbacks) :
         val compatibleReleasePairs = products.asSequence()
             .flatMap { (product, repository) ->
                 product.releases.asSequence()
-                    .filter { allowIncompatibleVersion || it.incompatibilities.isEmpty() }
+                    .filter { allowIncompatibleVersion || it.compatible }
                     .map { Pair(it, repository) }
             }
 
@@ -1714,7 +1714,7 @@ class AppDetailAdapter(private val callbacks: Callbacks) :
                     if (item.release.platforms.size == 1) item.release.platforms.first() else null
                 val installed = installedItem?.versionCode == item.release.versionCode
                 val suggested =
-                    incompatibility == null && item.release.selected && item.selectedRepository
+                    item.release.compatible && item.release.selected && item.selectedRepository
 
                 if (suggested) {
                     holder.itemView.apply {

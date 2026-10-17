@@ -27,9 +27,10 @@ class SessionInstaller(private val context: Context) : Installer {
 
     private val installer = context.packageManager.packageInstaller
     private val intent = Intent(context, SessionInstallerReceiver::class.java)
+    private var installerCallbacks: PackageInstaller.SessionCallback? = null
+    private var currentSessionId: Int? = null
 
     companion object {
-        private var installerCallbacks: PackageInstaller.SessionCallback? = null
         private val flags = if (SdkCheck.isSnowCake) PendingIntent.FLAG_MUTABLE else 0
     }
 
@@ -41,13 +42,21 @@ class SessionInstaller(private val context: Context) : Installer {
         val sessionParams = createSessionParams(installItem)
 
         val id = installer.createSession(sessionParams)
+        currentSessionId = id
         val installerCallback = object : PackageInstaller.SessionCallback() {
             override fun onCreated(sessionId: Int) {}
             override fun onBadgingChanged(sessionId: Int) {}
-            override fun onActiveChanged(sessionId: Int, active: Boolean) {}
+            override fun onActiveChanged(sessionId: Int, active: Boolean) {
+                if (sessionId == id && installer.getSessionInfo(id)?.isActive == active) {
+                    InstallConfirmation.refresh()
+                }
+            }
             override fun onProgressChanged(sessionId: Int, progress: Float) {}
             override fun onFinished(sessionId: Int, success: Boolean) {
-                if (sessionId == id) cont.resume(
+                if (sessionId == id) {
+                    InstallConfirmation.remove(context, id)
+                }
+                if (sessionId == id && cont.isActive) cont.resume(
                     if (success) InstallState.Installed else InstallState.Failed
                 )
             }
@@ -74,6 +83,7 @@ class SessionInstaller(private val context: Context) : Installer {
         }
 
         cont.invokeOnCancellation {
+            InstallConfirmation.remove(context, id)
             try {
                 installer.abandonSession(id)
             } catch (e: SecurityException) {
@@ -93,12 +103,15 @@ class SessionInstaller(private val context: Context) : Installer {
         }
 
     override fun close() {
+        val sessionId = currentSessionId
+        sessionId?.let { InstallConfirmation.remove(context, it) }
+        currentSessionId = null
         installerCallbacks?.let {
             installer.unregisterSessionCallback(it)
             installerCallbacks = null
         }
         try {
-            installer.mySessions.forEach { installer.abandonSession(it.sessionId) }
+            sessionId?.let { installer.abandonSession(it) }
         } catch (e: SecurityException) {
             log(e.message, type = Log.ERROR)
         }

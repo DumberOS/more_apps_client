@@ -28,11 +28,18 @@ data class Release(
     val incompatibilities: List<Incompatibility>,
 ) {
     sealed class Incompatibility {
+        // Feature declarations guide store filtering; Android does not enforce them on install.
+        val blocksInstallation: Boolean
+            get() = this !is Feature
+
         object MinSdk : Incompatibility()
         object MaxSdk : Incompatibility()
         object Platform : Incompatibility()
         class Feature(val feature: String) : Incompatibility()
     }
+
+    val compatible: Boolean
+        get() = incompatibilities.none { it.blocksInstallation }
 
     val identifier: String
         get() = "$versionCode.$hash"

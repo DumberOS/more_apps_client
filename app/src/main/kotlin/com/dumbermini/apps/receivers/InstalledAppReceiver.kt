@@ -29,9 +29,10 @@ class InstalledAppReceiver(
                 Intent.ACTION_PACKAGE_ADDED,
                 Intent.ACTION_PACKAGE_REMOVED,
                     -> {
-                    val packageInfo = packageManager.getPackageInfoCompat(packageName)
-                    if (packageInfo != null) {
-                        Database.InstalledAdapter.put(packageInfo.toInstalledItem())
+                    val installedItem = packageManager.getPackageInfoCompat(packageName)
+                        ?.toInstalledItem()
+                    if (installedItem != null) {
+                        Database.InstalledAdapter.put(installedItem)
                     } else {
                         Database.InstalledAdapter.delete(packageName)
                     }

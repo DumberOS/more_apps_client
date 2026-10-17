@@ -55,7 +55,11 @@ import com.dumbermini.apps.widget.addDivider
 import dagger.hilt.android.AndroidEntryPoint
 import kotlin.math.abs
 import kotlin.math.roundToInt
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import com.dumbermini.apps.R.string as stringRes
 
 @AndroidEntryPoint
@@ -98,6 +102,8 @@ class TabsFragment : ScreenFragment() {
     private var onBackPressedCallback: OnBackPressedCallback? = null
 
     private var countryPopup: android.widget.PopupWindow? = null
+    private var countryPickerJob: Job? = null
+    private data class CountryOption(val code: String, val name: String)
     private var promptedForCountries = false
 
     private val isLocalPage: Boolean
@@ -320,7 +326,7 @@ class TabsFragment : ScreenFragment() {
                 }
                 launch {
                     viewModel.availableCountries.collect {
-                        countryPopup?.dismiss()
+                        dismissCountryPicker()
                         updateFilterLabel()
                     }
                 }
@@ -423,8 +429,13 @@ class TabsFragment : ScreenFragment() {
         }
     }
 
+    override fun onPause() {
+        dismissCountryPicker()
+        super.onPause()
+    }
+
     override fun onDestroyView() {
-        countryPopup?.dismiss()
+        dismissCountryPicker()
         countryPopup = null
         super.onDestroyView()
 
@@ -564,27 +575,51 @@ class TabsFragment : ScreenFragment() {
     }
 
     private fun showCountryPicker() {
+        dismissCountryPicker()
+        val countryCodes = viewModel.availableCountries.value.toList()
+        val displayLocale = java.util.Locale.getDefault(java.util.Locale.Category.DISPLAY)
+        countryPickerJob = viewLifecycleOwner.lifecycleScope.launch {
+            val countries = withContext(Dispatchers.Default) {
+                // ICU lookups are expensive: resolve each label once, off the UI thread.
+                countryCodes.map { code ->
+                    ensureActive()
+                    CountryOption(
+                        code,
+                        java.util.Locale.Builder().setRegion(code).build()
+                            .getDisplayCountry(displayLocale),
+                    )
+                }.sortedBy { it.name }
+            }
+            if (isResumed && isLocalPage) showCountryPicker(countries)
+        }
+    }
+
+    private fun dismissCountryPicker() {
+        if (countryPickerJob?.isActive == true) promptedForCountries = false
+        countryPickerJob?.cancel()
+        countryPickerJob = null
         countryPopup?.dismiss()
+    }
+
+    private fun showCountryPicker(countries: List<CountryOption>) {
         val context = requireContext()
         fun pixels(dp: Int) = (dp * resources.displayMetrics.density).roundToInt()
         val availableHeight = android.widget.PopupWindow(context)
             .getMaxAvailableHeight(layout!!.sectionLayout)
-        val countries = viewModel.availableCountries.value.sortedBy {
-            java.util.Locale.Builder().setRegion(it).build().displayCountry
-        }
         val content = android.widget.LinearLayout(context).apply {
             orientation = android.widget.LinearLayout.VERTICAL
         }
         val list = android.widget.ListView(context).apply {
             choiceMode = android.widget.ListView.CHOICE_MODE_MULTIPLE
             adapter = android.widget.ArrayAdapter(context, android.R.layout.simple_list_item_multiple_choice,
-                countries.map { java.util.Locale.Builder().setRegion(it).build().displayCountry })
-            countries.forEachIndexed { index, code ->
-                setItemChecked(index, code in viewModel.countrySelection.countries.value)
+                countries.map { it.name })
+            countries.forEachIndexed { index, country ->
+                setItemChecked(index, country.code in viewModel.countrySelection.countries.value)
             }
             setOnItemClickListener { _, _, position, _ ->
                 val selected = viewModel.countrySelection.countries.value.toMutableSet()
-                if (isItemChecked(position)) selected.add(countries[position]) else selected.remove(countries[position])
+                val code = countries[position].code
+                if (isItemChecked(position)) selected.add(code) else selected.remove(code)
                 viewModel.countrySelection.select(selected)
             }
         }
@@ -706,7 +741,7 @@ class TabsFragment : ScreenFragment() {
 
         override fun onPageSelected(position: Int) {
             val source = AppListFragment.Source.entries[position]
-            countryPopup?.dismiss()
+            dismissCountryPicker()
             promptedForCountries = false
             if (isLocalPage) showSections = false
             updateFilterLabel()

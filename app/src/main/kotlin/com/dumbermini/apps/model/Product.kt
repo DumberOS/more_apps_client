@@ -87,7 +87,7 @@ data class Product(
         get() = selectedReleases.firstOrNull()?.versionCode ?: 0L
 
     val compatible: Boolean
-        get() = selectedReleases.firstOrNull()?.incompatibilities?.isEmpty() == true
+        get() = selectedReleases.firstOrNull()?.compatible == true
 
     val signatures: List<String>
         get() = selectedReleases.mapNotNull { it.signature.ifBlank { null } }.distinct().toList()

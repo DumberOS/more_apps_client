@@ -90,6 +90,29 @@ class ProductSignatureSelectionTest {
         assertEquals(product.versionCode, suggested!!.first.versionCode)
     }
 
+    @Test
+    fun `missing features warn without blocking installation or updates`() {
+        val original = product("com.google.android.googlequicksearchbox", 2, "signature")
+        val warning = Release.Incompatibility.Feature("com.google.android.feature.NEXT_GENERATION_ASSISTANT")
+        val release = original.releases.single().copy(incompatibilities = listOf(warning))
+        val product = original.copy(releases = listOf(release))
+
+        assertTrue(release.compatible)
+        assertEquals(listOf(warning), release.incompatibilities)
+        assertTrue(product.compatible)
+        assertTrue(product.canUpdate(InstalledItem(product.packageName, "1", 1, "signature")))
+
+        for (blocker in listOf(
+            Release.Incompatibility.MinSdk,
+            Release.Incompatibility.MaxSdk,
+            Release.Incompatibility.Platform,
+        )) {
+            val blocked = release.copy(incompatibilities = listOf(warning, blocker))
+            assertFalse(blocked.compatible)
+            assertFalse(product.copy(releases = listOf(blocked)).compatible)
+        }
+    }
+
     private fun product(
         packageName: String,
         versionCode: Long,

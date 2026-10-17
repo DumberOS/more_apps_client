@@ -435,7 +435,7 @@ object RepositoryUpdater {
         }
 
         val firstSelected =
-            releasePairs.firstOrNull { it.second.isEmpty() && predicate(it.first) }
+            releasePairs.firstOrNull { it.second.none { reason -> reason.blocksInstallation } && predicate(it.first) }
                 ?: releasePairs.firstOrNull { predicate(it.first) }
 
         val releases = releasePairs

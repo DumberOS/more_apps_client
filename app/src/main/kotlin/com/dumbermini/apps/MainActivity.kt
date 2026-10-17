@@ -1,5 +1,6 @@
 package com.dumbermini.apps
 
+import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.os.Build
 import android.os.Bundle
@@ -13,12 +14,15 @@ import androidx.appcompat.widget.Toolbar
 import androidx.core.view.WindowCompat
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.commit
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import com.dumbermini.apps.database.CursorOwner
 import com.dumbermini.apps.datastore.SettingsRepository
 import com.dumbermini.apps.datastore.extension.getThemeRes
 import com.dumbermini.apps.datastore.get
 import com.dumbermini.apps.installer.InstallManager
+import com.dumbermini.apps.installer.installers.session.InstallConfirmation
 import com.dumbermini.apps.installer.model.installFrom
 import com.dumbermini.apps.ui.appDetail.AppDetailFragment
 import com.dumbermini.apps.ui.favourites.FavouritesFragment
@@ -33,6 +37,7 @@ import com.dumbermini.apps.utility.common.deeplinkType
 import com.dumbermini.apps.utility.common.extension.homeAsUp
 import com.dumbermini.apps.utility.common.extension.inputManager
 import com.dumbermini.apps.utility.common.getInstallPackageName
+import com.dumbermini.apps.utility.common.log
 import com.dumbermini.apps.utility.common.requestNotificationPermission
 import dagger.hilt.EntryPoint
 import dagger.hilt.InstallIn
@@ -50,6 +55,7 @@ import kotlinx.parcelize.Parcelize
 class MainActivity : AppCompatActivity() {
     companion object {
         private const val STATE_FRAGMENT_STACK = "fragmentStack"
+        private const val STATE_CONFIRMATION_SESSION = "confirmationSession"
         const val ACTION_UPDATES = "${BuildConfig.APPLICATION_ID}.intent.action.UPDATES"
         const val ACTION_INSTALL = "${BuildConfig.APPLICATION_ID}.intent.action.INSTALL"
         const val EXTRA_CACHE_FILE_NAME =
@@ -58,6 +64,14 @@ class MainActivity : AppCompatActivity() {
 
     private val notificationPermission =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { }
+
+    private var confirmationSessionId: Int? = null
+    private val installationConfirmation =
+        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
+            confirmationSessionId?.let { InstallConfirmation.remove(this, it) }
+            confirmationSessionId = null
+            InstallConfirmation.refresh()
+        }
 
     @Inject
     lateinit var installer: InstallManager
@@ -115,6 +129,25 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         collectChange()
         super.onCreate(savedInstanceState)
+        confirmationSessionId = savedInstanceState?.getInt(STATE_CONFIRMATION_SESSION, -1)
+            ?.takeIf { it >= 0 }
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.RESUMED) {
+                InstallConfirmation.changes.collect {
+                    if (confirmationSessionId == null) {
+                        InstallConfirmation.next(this@MainActivity)?.let { request ->
+                            confirmationSessionId = request.sessionId
+                            try {
+                                installationConfirmation.launch(request.intent)
+                            } catch (e: ActivityNotFoundException) {
+                                confirmationSessionId = null
+                                log(e.message)
+                            }
+                        }
+                    }
+                }
+            }
+        }
         val rootView = FrameLayout(this).apply { id = R.id.main_content }
         addContentView(
             rootView,
@@ -164,6 +197,7 @@ class MainActivity : AppCompatActivity() {
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
         outState.putParcelableArrayList(STATE_FRAGMENT_STACK, ArrayList(fragmentStack))
+        confirmationSessionId?.let { outState.putInt(STATE_CONFIRMATION_SESSION, it) }
     }
 
     private fun backHandler() {
