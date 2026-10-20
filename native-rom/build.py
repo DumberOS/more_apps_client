@@ -128,12 +128,16 @@ def main():
     with zipfile.ZipFile(out/'app.jar','w',zipfile.ZIP_DEFLATED) as z:
         for p in sorted(classes.rglob('*')):
             if p.is_file():zipwrite(z,p.relative_to(classes),p.read_bytes())
+        # KSP emits resources as well as source: Hilt's LazyClassKey rules
+        # prevent R8 from merging distinct ViewModel keys into the same class.
+        for p in sorted((ksp/'resources').rglob('*')):
+            if p.is_file():zipwrite(z,p.relative_to(ksp/'resources'),p.read_bytes())
     if args.phase=='classes':return
     rules=[native/'proguard-android-optimize.pro',root/'app/proguard.pro',out/'aapt.pro']
     rules += [d/'proguard.txt' for d in aars if (d/'proguard.txt').exists()]
-    # Consumer rules embedded in dependency jars are part of the library contract.
+    # Include processor-generated rules as well as dependency consumer rules.
     embedded=[]
-    for jar in runtime:
+    for jar in [out/'app.jar',*runtime]:
         with zipfile.ZipFile(jar) as z:
             for n in z.namelist():
                 if n.startswith('META-INF/proguard/') and n.endswith('.pro'):
@@ -147,7 +151,7 @@ def main():
     shutil.copy2(out/'resources.apk',out/'unsigned.apk')
     # Preserve service-provider registrations and other runtime resources.
     resources={}
-    for jar in runtime:
+    for jar in [out/'app.jar',*runtime]:
         with zipfile.ZipFile(jar) as z:
             for n in z.namelist():
                 if n.endswith('/') or n.endswith(('.class','.kotlin_metadata','.kotlin_builtins','.kotlin_module','.SF','.RSA','.DSA')) or n=='META-INF/MANIFEST.MF':continue
