@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<permissions>
+    <privapp-permissions package="com.dumbermini.apps.full">
+        <permission name="android.permission.REQUEST_INSTALL_PACKAGES"/>
+        <permission name="android.permission.INSTALL_PACKAGES"/>
+    </privapp-permissions>
+    <privapp-permissions package="com.dumbermini.apps">
+        <permission name="android.permission.REQUEST_INSTALL_PACKAGES"/>
+        <permission name="android.permission.INSTALL_PACKAGES"/>
+    </privapp-permissions>
+</permissions>
