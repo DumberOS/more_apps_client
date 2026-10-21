@@ -40,8 +40,14 @@ class AppDetailViewModel @Inject constructor(
     private val settingsRepository: SettingsRepository,
     private val customButtonRepository: CustomButtonRepository,
     privacyRepository: PrivacyRepository,
-    savedStateHandle: SavedStateHandle,
+    private val savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
+
+    val installationProblems = savedStateHandle.getStateFlow("installation_problems", arrayListOf<String>())
+
+    fun reportInstallationProblems(names: List<String>) {
+        savedStateHandle["installation_problems"] = ArrayList(names)
+    }
 
     val packageName: String = requireNotNull(savedStateHandle[ARG_PACKAGE_NAME])
 

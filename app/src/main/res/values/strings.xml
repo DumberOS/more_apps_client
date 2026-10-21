@@ -298,4 +298,7 @@
     <string name="custom_buttons_export">Export buttons</string>
     <string name="custom_buttons_import">Import buttons</string>
     <string name="custom_buttons_imported">Custom buttons imported</string>
+    <string name="android_auto_install_title">Install Android Auto?</string>
+    <string name="android_auto_install_message">More Apps will also install the apps required by Android Auto: Google Maps, Google Searchbox, and Google Speech Recognition.</string>
+    <string name="install_unavailable_message">More Apps could not queue the following apps. Check that they are available and compatible, that there is enough storage, and try again:\n\n%1$s</string>
 </resources>

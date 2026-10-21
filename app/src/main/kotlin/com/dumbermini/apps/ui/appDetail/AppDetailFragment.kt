@@ -35,6 +35,7 @@ import com.dumbermini.apps.model.Repository
 import com.dumbermini.apps.model.findSuggested
 import com.dumbermini.apps.service.Connection
 import com.dumbermini.apps.service.DownloadService
+import com.dumbermini.apps.service.AndroidAutoInstall
 import com.dumbermini.apps.ui.Message
 import com.dumbermini.apps.ui.MessageDialog
 import com.dumbermini.apps.ui.ScreenFragment
@@ -120,6 +121,33 @@ class AppDetailFragment() : ScreenFragment(), AppDetailAdapter.Callbacks {
     @SuppressLint("RestrictedApi")
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+
+        childFragmentManager.setFragmentResultListener(
+            AndroidAutoInstallDialog.REQUEST_KEY, viewLifecycleOwner,
+        ) { _, result ->
+            if (!checkInstaller()) return@setFragmentResultListener
+            val binder = downloadConnection.binder
+            if (binder == null) {
+                viewModel.reportInstallationProblems(listOf("Android Auto"))
+            } else {
+                binder.installAndroidAuto(
+                    result.takeIf { it.containsKey(AndroidAutoInstallDialog.REPOSITORY_ID) }
+                        ?.getLong(AndroidAutoInstallDialog.REPOSITORY_ID),
+                    result.getString(AndroidAutoInstallDialog.RELEASE_ID),
+                    viewModel::reportInstallationProblems,
+                )
+            }
+        }
+        viewLifecycleOwner.lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.RESUMED) {
+                viewModel.installationProblems.collect { names ->
+                    if (names.isNotEmpty()) {
+                        MessageDialog(Message.InstallUnavailable(names)).show(childFragmentManager)
+                        viewModel.reportInstallationProblems(emptyList())
+                    }
+                }
+            }
+        }
 
         detailAdapter = AppDetailAdapter(this@AppDetailFragment)
         mainActivity.onToolbarCreated(toolbar)
@@ -385,7 +413,9 @@ class AppDetailFragment() : ScreenFragment(), AppDetailAdapter.Callbacks {
             this.downloading = isActive
             updateButtons()
         }
-        if (state.currentItem is DownloadService.State.Success && isResumed) {
+        if (state.currentItem is DownloadService.State.Success &&
+            !state.currentItem.installHandledByService && isResumed
+        ) {
             viewModel.installPackage(
                 state.currentItem.packageName,
                 state.currentItem.release.cacheFileName,
@@ -402,16 +432,8 @@ class AppDetailFragment() : ScreenFragment(), AppDetailAdapter.Callbacks {
                     MessageDialog(Message.InsufficientStorage).show(childFragmentManager)
                     return
                 }
-                val shizukuState = viewModel.shizukuState(requireContext())
-                if (shizukuState != null && shizukuState.check) {
-                    shizukuDialog(
-                        context = requireContext(),
-                        shizukuState = shizukuState,
-                        openShizuku = { launchShizuku(requireContext()) },
-                        switchInstaller = { viewModel.setDefaultInstaller() },
-                    ).show()
-                    return
-                }
+                if (!checkInstaller()) return
+                if (action == AppDetailAdapter.Action.INSTALL && confirmAndroidAutoInstall()) return
                 downloadConnection.startUpdate(
                     packageName = viewModel.packageName,
                     installedItem = installed?.installedItem,
@@ -554,9 +576,37 @@ class AppDetailFragment() : ScreenFragment(), AppDetailAdapter.Callbacks {
             }
 
             else -> {
+                if (confirmAndroidAutoInstall(release)) return
                 queueReleaseInstall(release, installedItem)
             }
         }
+    }
+
+    private fun checkInstaller(): Boolean {
+        val shizukuState = viewModel.shizukuState(requireContext())
+        if (shizukuState != null && shizukuState.check) {
+            shizukuDialog(
+                context = requireContext(),
+                shizukuState = shizukuState,
+                openShizuku = { launchShizuku(requireContext()) },
+                switchInstaller = { viewModel.setDefaultInstaller() },
+            ).show()
+            return false
+        }
+        return true
+    }
+
+    private fun confirmAndroidAutoInstall(release: Release? = null): Boolean {
+        if (viewModel.packageName != AndroidAutoInstall.PACKAGE_NAME || installed != null) return false
+        val tag = AndroidAutoInstallDialog.REQUEST_KEY
+        if (childFragmentManager.findFragmentByTag(tag) == null) {
+            val repositoryId = release?.let { selected ->
+                products.firstOrNull { (product, _) -> selected in product.releases }?.second?.id
+            }
+            AndroidAutoInstallDialog.newInstance(repositoryId, release?.identifier)
+                .showNow(childFragmentManager, tag)
+        }
+        return true
     }
 
     private fun queueReleaseInstall(release: Release, installedItem: InstalledItem?) {

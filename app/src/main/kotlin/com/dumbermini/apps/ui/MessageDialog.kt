@@ -43,6 +43,12 @@ class MessageDialog() : DialogFragment() {
             arguments?.getParcelable(EXTRA_MESSAGE)!!
         }
         when (message) {
+            is Message.InstallUnavailable -> {
+                dialog.setTitle(stringRes.action_failed)
+                dialog.setMessage(getString(stringRes.install_unavailable_message, message.names.joinToString("\n")))
+                dialog.setPositiveButton(stringRes.ok, null)
+            }
+
             is Message.DeleteRepositoryConfirm -> {
                 dialog.setTitle(stringRes.confirmation)
                 dialog.setMessage(stringRes.delete_repository_DESC)
@@ -194,6 +200,9 @@ class MessageDialog() : DialogFragment() {
 
 @Parcelize
 sealed interface Message : Parcelable {
+    @Parcelize
+    class InstallUnavailable(val names: List<String>) : Message
+
     @Parcelize
     data object DeleteRepositoryConfirm : Message
 

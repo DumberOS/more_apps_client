@@ -10,6 +10,8 @@ import androidx.core.app.NotificationCompat
 import androidx.core.net.toUri
 import com.dumbermini.apps.BuildConfig
 import com.dumbermini.apps.MainActivity
+import com.dumbermini.apps.database.Database
+import com.dumbermini.apps.data.model.toPackageName
 import com.dumbermini.apps.datastore.SettingsRepository
 import com.dumbermini.apps.datastore.get
 import com.dumbermini.apps.datastore.model.InstallerType
@@ -35,11 +37,15 @@ import com.dumbermini.apps.utility.common.extension.updateAsMutable
 import com.dumbermini.apps.utility.common.log
 import com.dumbermini.apps.utility.notifications.createInstallNotification
 import com.dumbermini.apps.utility.notifications.installNotification
+import com.dumbermini.apps.utility.extension.DownloadSelection
+import com.dumbermini.apps.utility.extension.selectDownload
 import dagger.hilt.android.AndroidEntryPoint
 import java.io.File
 import javax.inject.Inject
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
@@ -80,7 +86,11 @@ class DownloadService : ConnectionService<DownloadService.Binder>() {
 
         data class Error(val name: String) : State(name)
         data class Cancel(val name: String) : State(name)
-        data class Success(val name: String, val release: Release) : State(name)
+        data class Success(
+            val name: String,
+            val release: Release,
+            val installHandledByService: Boolean = false,
+        ) : State(name)
     }
 
     data class DownloadState(
@@ -110,6 +120,7 @@ class DownloadService : ConnectionService<DownloadService.Binder>() {
         val url: String,
         val authentication: String,
         val isUpdate: Boolean = false,
+        val installAfterDownload: Boolean = false,
     ) {
         val notificationTag: String
             get() = "download-$packageName"
@@ -122,15 +133,79 @@ class DownloadService : ConnectionService<DownloadService.Binder>() {
     private var currentTask: CurrentTask? = null
 
     private val lock = Mutex()
+    private var preparingAndroidAuto = false
+
+    private fun isActive(packageName: String): Boolean =
+        tasks.any { it.packageName == packageName } ||
+            currentTask?.task?.packageName == packageName ||
+            installer.state.value[packageName.toPackageName()] in
+            setOf(InstallState.Pending, InstallState.Installing)
 
     inner class Binder : android.os.Binder() {
         val downloadState = _downloadState.asStateFlow()
+
+        fun installAndroidAuto(
+            repositoryId: Long?,
+            releaseIdentifier: String?,
+            onUnavailable: (List<String>) -> Unit,
+        ) {
+            if (preparingAndroidAuto || isActive(AndroidAutoInstall.PACKAGE_NAME)) return
+            preparingAndroidAuto = true
+            lifecycleScope.launch {
+                try {
+                    val (installed, available) = withContext(Dispatchers.IO) {
+                        val repositories = Database.RepositoryAdapter.getAll().associateBy { it.id }
+                        val packages = listOf(AndroidAutoInstall.PACKAGE_NAME) + AndroidAutoInstall.dependencies.keys
+                        val installed = packages.filter {
+                            Database.InstalledAdapter.get(it, null) != null
+                        }.toSet()
+                        val available = packages.mapNotNull { packageName ->
+                            val products = Database.ProductAdapter.get(packageName, null).mapNotNull { product ->
+                                repositories[product.repositoryId]?.let { product to it }
+                            }
+                            val selection = if (packageName == AndroidAutoInstall.PACKAGE_NAME && releaseIdentifier != null) {
+                                products.firstOrNull { it.second.id == repositoryId }?.let { (product, repository) ->
+                                    product.releases.find { it.identifier == releaseIdentifier }?.let {
+                                        DownloadSelection(product.name, repository, it)
+                                    }
+                                }
+                            } else products.selectDownload(null)
+                            selection?.let { packageName to it }
+                        }.toMap()
+                        installed to available
+                    }
+                    val packageName = AndroidAutoInstall.PACKAGE_NAME
+                    if (packageName in installed || isActive(packageName)) return@launch
+                    val selection = available[packageName]
+                    val freeSpace = Cache.getEmptySpace(this@DownloadService)
+                    if (selection == null || !selection.release.compatible || selection.release.size > freeSpace) {
+                        onUnavailable(listOf("Android Auto"))
+                        return@launch
+                    }
+                    val plan = AndroidAutoInstall.planDependencies(
+                        installed,
+                        AndroidAutoInstall.dependencies.keys.filter(::isActive).toSet(),
+                        available,
+                        freeSpace,
+                    )
+                    enqueue(packageName, selection.name, selection.repository, selection.release, installAfterDownload = true)
+                    plan.downloads.forEach { (dependency, download) ->
+                        enqueue(dependency, download.name, download.repository, download.release, installAfterDownload = true)
+                    }
+                    if (plan.unavailable.isNotEmpty()) onUnavailable(plan.unavailable)
+                } finally {
+                    preparingAndroidAuto = false
+                }
+            }
+        }
+
         fun enqueue(
             packageName: String,
             name: String,
             repository: Repository,
             release: Release,
             isUpdate: Boolean = false,
+            installAfterDownload: Boolean = false,
         ) {
             val task = Task(
                 packageName = packageName,
@@ -139,6 +214,7 @@ class DownloadService : ConnectionService<DownloadService.Binder>() {
                 url = release.getDownloadUrl(repository),
                 authentication = repository.authentication,
                 isUpdate = isUpdate,
+                installAfterDownload = installAfterDownload,
             )
             if (Cache.getReleaseFile(this@DownloadService, release.cacheFileName).exists()) {
                 lifecycleScope.launch { publishSuccess(task) }
@@ -301,7 +377,7 @@ class DownloadService : ConnectionService<DownloadService.Binder>() {
     private suspend fun publishSuccess(task: Task) {
         val currentInstaller = installerType.first()
         updateCurrentQueue { add("") }
-        updateCurrentState(State.Success(task.packageName, task.release))
+        updateCurrentState(State.Success(task.packageName, task.release, task.installAfterDownload))
         val hasSilentInstallPermission =
             packageManager.checkPermission(
                 Manifest.permission.INSTALL_PACKAGES,
@@ -316,7 +392,7 @@ class DownloadService : ConnectionService<DownloadService.Binder>() {
                     )
 
         showNotificationInstall(task)
-        if (currentInstaller == InstallerType.ROOT ||
+        if (task.installAfterDownload || currentInstaller == InstallerType.ROOT ||
             currentInstaller == InstallerType.SHIZUKU ||
             autoInstallWithSessionInstaller
         ) {
